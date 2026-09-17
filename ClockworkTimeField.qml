@@ -7,13 +7,14 @@ Item {
     id: root
 
     // =========================================================================
-    // Component Properties
+    // Properties
     // =========================================================================
     property int value: 0
     property int from: 0
     property int to: 59
     property bool wrap: true
     property real fontSize: 36
+    readonly property bool isVisualActive: editor.activeFocus
 
     // =========================================================================
     // Signals
@@ -21,8 +22,9 @@ Item {
     signal modified(int newValue)
     signal editingFinished()
 
-    readonly property bool isVisualActive: editor.activeFocus
-
+    // =========================================================================
+    // Dimensions
+    // =========================================================================
     implicitWidth: Math.max(88, Math.round(root.fontSize * 2.3))
     implicitHeight: Math.max(54, Math.round(root.fontSize * 1.5))
 
@@ -40,7 +42,7 @@ Item {
 
         border.color: root.isVisualActive
             ? Theme.primary
-            : Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, 0.12)
+            : Theme.withAlpha(Theme.outline, 0.12)
         border.width: root.isVisualActive ? 2 : 1
 
         Behavior on color {
@@ -63,9 +65,9 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 150 } }
         }
 
-        // Mouse Wheel Scroll Adjustment
+        // Mouse Wheel Scroll Adjustment (Mouse only to prevent touchpad runaway)
         WheelHandler {
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            acceptedDevices: PointerDevice.Mouse
             enabled: root.enabled
             onWheel: event => {
                 if (event.angleDelta.y > 0) {
@@ -94,10 +96,9 @@ Item {
             inputMethodHints: Qt.ImhDigitsOnly
             maximumLength: Math.max(2, String(root.to).length)
             validator: IntValidator {
-                bottom: root.from
+                bottom: 0
                 top: root.to
             }
-            clip: true
 
             onEditingFinished: root.commitText()
 
@@ -141,18 +142,10 @@ Item {
     // =========================================================================
     // Helper Methods
     // =========================================================================
-    onValueChanged: {
-        if (!editor.activeFocus) {
-            editor.text = Engine.pad2(root.value);
-        }
-    }
-
     function commitText() {
-        var parsed = parseInt(editor.text, 10);
-        if (isNaN(parsed)) {
-            parsed = root.value;
-        }
-        var clamped = Math.max(root.from, Math.min(root.to, parsed));
+        const parsed = parseInt(editor.text, 10);
+        const resolved = isNaN(parsed) ? root.value : parsed;
+        const clamped = Math.max(root.from, Math.min(root.to, resolved));
         if (clamped !== root.value) {
             root.modified(clamped);
         }
@@ -161,7 +154,7 @@ Item {
     }
 
     function stepUp() {
-        var nextVal = root.value + 1;
+        let nextVal = root.value + 1;
         if (nextVal > root.to) {
             nextVal = root.wrap ? root.from : root.to;
         }
@@ -171,7 +164,7 @@ Item {
     }
 
     function stepDown() {
-        var nextVal = root.value - 1;
+        let nextVal = root.value - 1;
         if (nextVal < root.from) {
             nextVal = root.wrap ? root.to : root.from;
         }

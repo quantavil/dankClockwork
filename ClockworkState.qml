@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Common
 import "ClockworkEngine.js" as Engine
 
 Item {
@@ -66,7 +67,7 @@ Item {
         : alarmHour
     readonly property string alarmMeridiem: Engine.convert24To12(alarmHour).meridiem
     readonly property string alarmSoundName: Engine.getAlarmSoundName(alarmSound)
-    readonly property string alarmTimeText: Engine.getAlarmTimeText(root)
+    readonly property string alarmTimeText: Engine.getAlarmTimeText(root.getEngineSnapshot())
 
     // =========================================================================
     // Intervals Mode Properties
@@ -76,7 +77,7 @@ Item {
     property int intervalSeconds: 30
 
     readonly property string intervalDurationText: Engine.pad2(intervalMinutes) + ":" + Engine.pad2(intervalSeconds)
-    readonly property int currentRound: Engine.getCurrentRound(root, nowMs)
+    readonly property int currentRound: Engine.getCurrentRound(root.getEngineSnapshot(), nowMs)
 
     // =========================================================================
     // Pomodoro Mode Properties
@@ -86,22 +87,181 @@ Item {
     property int pomodoroCycles: 4
     property int pomodoroLongBreakMinutes: 15
     property bool pomodoroSoundEnabled: true
-    property color pomodoroBreakColor: "#a6e3a1"
+    property color pomodoroBreakColor: Theme.secondary
     property string pomodoroPhaseKind: "focus"
     property int pomodoroCurrentCycle: 1
     property int pomodoroCompletedCycles: 0
     property bool pomodoroSessionStarted: false
 
-    readonly property var pomodoroPhase: Engine.getPomodoroPhase(root, nowMs)
+    readonly property var pomodoroPhase: Engine.getPomodoroPhase(root.getEngineSnapshot(), nowMs)
 
     // =========================================================================
-    // Computed Properties Delegating to Engine
+    // Computed Properties Delegating to Pure Engine Snapshot (DMS Rule 2)
     // =========================================================================
-    readonly property string displayText: Engine.getDisplayText(root, nowMs)
-    readonly property string barTimeText: Engine.getBarTimeText(root, nowMs)
-    readonly property string statusText: Engine.getStatusText(root, nowMs)
-    readonly property real progress: Engine.getProgress(root, nowMs)
+    readonly property string displayText: Engine.getDisplayText(root.getEngineSnapshot(), nowMs)
+    readonly property string barTimeText: Engine.getBarTimeText(root.getEngineSnapshot(), nowMs)
+    readonly property string statusText: Engine.getStatusText(root.getEngineSnapshot(), nowMs)
+    readonly property real progress: Engine.getProgress(root.getEngineSnapshot(), nowMs)
     readonly property string modeName: Engine.getModeName(root.mode)
+
+    // =========================================================================
+    // Timers
+    // =========================================================================
+    Timer {
+        id: tickTimer
+        interval: (root.popoutOpen && root.mode === root.stopwatchMode) ? 20 : 250
+        repeat: true
+        running: root.running
+        onTriggered: root.tick()
+    }
+
+    Timer {
+        id: completionBellTimer
+        interval: 600
+        repeat: false
+        onTriggered: root.playNextCompletionBell()
+    }
+
+    Timer {
+        id: alarmRingTimer
+        interval: 3000
+        repeat: true
+        onTriggered: {
+            if (Date.now() >= root.alarmRingEndsAt) {
+                root.stopAlarmRinging();
+                return;
+            }
+            root.playSound(root.alarmSound);
+        }
+    }
+
+    // =========================================================================
+    // Unified IPC Interface (Singleton: guarantees single registration across monitors)
+    // =========================================================================
+    IpcHandler {
+        target: "clockwork"
+
+        function stopwatch(): string {
+            root.selectMode(root.stopwatchMode);
+            root.startPause();
+            return "CLOCKWORK_STOPWATCH_STARTED";
+        }
+
+        function countdown(minutes: string, seconds: string): string {
+            const m = parseInt(minutes, 10);
+            const s = (seconds !== undefined && seconds !== "") ? parseInt(seconds, 10) : 0;
+            if (isNaN(m) || isNaN(s) || (m === 0 && s === 0) || m < 0 || s < 0) {
+                return "ERROR_INVALID_ARGUMENTS";
+            }
+            root.selectMode(root.countdownMode);
+            root.setCountdownMinutes(m);
+            root.setCountdownSeconds(s);
+            root.startPause();
+            return "CLOCKWORK_COUNTDOWN_STARTED";
+        }
+
+        function intervals(rounds: string, minutes: string, seconds: string): string {
+            const r = parseInt(rounds, 10);
+            const m = (minutes !== undefined && minutes !== "") ? parseInt(minutes, 10) : 0;
+            const s = (seconds !== undefined && seconds !== "") ? parseInt(seconds, 10) : 0;
+            if (isNaN(r) || isNaN(m) || isNaN(s) || r <= 0 || (m === 0 && s === 0)) {
+                return "ERROR_INVALID_ARGUMENTS";
+            }
+            root.selectMode(root.intervalsMode);
+            root.setIntervalRounds(r);
+            root.setIntervalMinutes(m);
+            root.setIntervalSeconds(s);
+            root.startPause();
+            return "CLOCKWORK_INTERVALS_STARTED";
+        }
+
+        function alarm(hour: string, minute: string, message: string): string {
+            const h = parseInt(hour, 10);
+            const m = (minute !== undefined && minute !== "") ? parseInt(minute, 10) : 0;
+            if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+                return "ERROR_INVALID_ARGUMENTS";
+            }
+            root.selectMode(root.alarmMode);
+            root.setAlarmHour(h);
+            root.setAlarmMinute(m);
+            if (typeof message !== "undefined" && message !== "") {
+                root.setAlarmMessage(message);
+            }
+            root.startPause();
+            return "CLOCKWORK_ALARM_ARMED";
+        }
+
+        function pomodoro(work: string, shortBreak: string, cycles: string, longBreak: string): string {
+            const w = (work !== undefined && work !== "") ? parseInt(work, 10) : root.pomodoroWorkMinutes;
+            const sb = (shortBreak !== undefined && shortBreak !== "") ? parseInt(shortBreak, 10) : root.pomodoroShortBreakMinutes;
+            const c = (cycles !== undefined && cycles !== "") ? parseInt(cycles, 10) : root.pomodoroCycles;
+            const lb = (longBreak !== undefined && longBreak !== "") ? parseInt(longBreak, 10) : root.pomodoroLongBreakMinutes;
+            if (isNaN(w) || isNaN(sb) || isNaN(c) || isNaN(lb) || w <= 0 || sb <= 0 || c <= 0 || lb <= 0) {
+                return "ERROR_INVALID_ARGUMENTS";
+            }
+            root.selectMode(root.pomodoroMode);
+            root.setPomodoroWorkMinutes(w);
+            root.setPomodoroShortBreakMinutes(sb);
+            root.setPomodoroCycles(c);
+            root.setPomodoroLongBreakMinutes(lb);
+            root.startPause();
+            return "CLOCKWORK_POMODORO_STARTED";
+        }
+
+        function start(): string {
+            if (root.running) return "CLOCKWORK_ALREADY_RUNNING";
+            root.start();
+            return "CLOCKWORK_STARTED";
+        }
+
+        function pause(): string {
+            if (!root.running) return "CLOCKWORK_ALREADY_PAUSED";
+            root.pause();
+            return "CLOCKWORK_PAUSED";
+        }
+
+        function toggle(): string {
+            root.startPause();
+            return root.running ? "CLOCKWORK_RUNNING" : "CLOCKWORK_PAUSED";
+        }
+
+        function reset(): string {
+            root.reset();
+            return "CLOCKWORK_RESET";
+        }
+
+        function skip(): string {
+            if (root.mode !== root.pomodoroMode) return "ERROR_NOT_POMODORO";
+            root.skipPomodoroPhase();
+            return "CLOCKWORK_POMODORO_SKIPPED";
+        }
+
+        function status(): string {
+            return JSON.stringify({
+                mode: root.modeName,
+                running: root.running,
+                completed: root.completed,
+                displayText: root.displayText,
+                statusText: root.statusText,
+                progress: root.progress
+            });
+        }
+
+        function open(): string {
+            root.openPopoutRequested();
+            return "CLOCKWORK_POPOUT_OPENED";
+        }
+
+        function togglePopout(): string {
+            root.togglePopoutRequested();
+            return "CLOCKWORK_POPOUT_TOGGLED";
+        }
+
+        function close(): string {
+            root.closePopoutRequested();
+            return "CLOCKWORK_POPOUT_CLOSED";
+        }
+    }
 
     // =========================================================================
     // Internal State Snapshot & Synchronization Helpers
@@ -189,8 +349,8 @@ Item {
     // Sound & Notification Bridges
     // =========================================================================
     function playSound(file) {
-        var soundFile = file || "complete.oga";
-        var soundPath = soundFile.startsWith("/")
+        const soundFile = file || "complete.oga";
+        const soundPath = soundFile.startsWith("/")
             ? soundFile
             : "/usr/share/sounds/freedesktop/stereo/" + soundFile;
         Quickshell.execDetached([
@@ -201,9 +361,9 @@ Item {
     }
 
     function notify(body, title, isUrgent) {
-        var appTitle = title || "Clockwork";
-        var message = body !== undefined && body !== null ? String(body) : "";
-        var args = ["notify-send", "-a", "Clockwork"];
+        const appTitle = title || "Clockwork";
+        const message = body !== undefined && body !== null ? String(body) : "";
+        const args = ["notify-send", "-a", "Clockwork"];
         if (isUrgent || (root.mode === root.alarmMode && root.completed)) {
             args.push("-u", "critical", "-c", "alarm");
         }
@@ -216,20 +376,20 @@ Item {
 
     function processEvents(events) {
         if (!events || !events.length) return;
-        for (var i = 0; i < events.length; ++i) {
-            var ev = events[i];
+        for (let i = 0; i < events.length; ++i) {
+            const ev = events[i];
             if (ev.type === "sound") {
                 if (root.completed) {
                     if (root.mode === root.alarmMode) {
-                        startAlarmRinging();
+                        root.startAlarmRinging();
                     } else {
-                        playCompletionSequence(ev.file || "complete.oga");
+                        root.playCompletionSequence(ev.file || "complete.oga");
                     }
                 } else {
-                    playSound(ev.file);
+                    root.playSound(ev.file);
                 }
             } else if (ev.type === "notify") {
-                notify(ev.body, ev.title, root.mode === root.alarmMode && root.completed);
+                root.notify(ev.body, ev.title, root.mode === root.alarmMode && root.completed);
             }
         }
     }
@@ -238,7 +398,7 @@ Item {
         alarmRingTimer.stop();
         root.isAlarmRinging = true;
         root.alarmRingEndsAt = Date.now() + 3 * 60 * 1000;
-        playSound(root.alarmSound);
+        root.playSound(root.alarmSound);
         alarmRingTimer.start();
     }
 
@@ -257,12 +417,12 @@ Item {
         completionBellTimer.stop();
         root.completionSoundFile = soundFile || "complete.oga";
         root.completionBellsRemaining = 3;
-        playNextCompletionBell();
+        root.playNextCompletionBell();
     }
 
     function playNextCompletionBell() {
         if (root.completionBellsRemaining <= 0) return;
-        playSound(root.completionSoundFile);
+        root.playSound(root.completionSoundFile);
         root.completionBellsRemaining -= 1;
         if (root.completionBellsRemaining > 0) {
             completionBellTimer.restart();
@@ -277,129 +437,129 @@ Item {
         if (!root.running || root.mode === root.stopwatchMode) {
             return;
         }
-        var res = Engine.tick(root.getEngineSnapshot(), root.nowMs);
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.tick(root.getEngineSnapshot(), root.nowMs);
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function startPause() {
         if (root.completed || (root.running && root.mode === root.alarmMode)) {
-            stopAlarmRinging();
+            root.stopAlarmRinging();
             completionBellTimer.stop();
             root.completionBellsRemaining = 0;
         }
         root.breakDismissed = false;
-        var res = Engine.startPause(root.getEngineSnapshot(), Date.now());
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.startPause(root.getEngineSnapshot(), Date.now());
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function pause() {
-        var res = Engine.pause(root.getEngineSnapshot(), Date.now());
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.pause(root.getEngineSnapshot(), Date.now());
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function reset() {
-        stopAlarmRinging();
+        root.stopAlarmRinging();
         completionBellTimer.stop();
         root.completionBellsRemaining = 0;
         root.breakDismissed = false;
-        var res = Engine.reset(root.getEngineSnapshot(), Date.now());
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.reset(root.getEngineSnapshot(), Date.now());
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function selectMode(nextMode) {
-        stopAlarmRinging();
+        root.stopAlarmRinging();
         completionBellTimer.stop();
         root.completionBellsRemaining = 0;
-        var res = Engine.selectMode(root.getEngineSnapshot(), nextMode, Date.now());
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.selectMode(root.getEngineSnapshot(), nextMode, Date.now());
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function skipPomodoroPhase() {
-        var res = Engine.skipPomodoro(root.getEngineSnapshot(), Date.now());
-        applyEngineState(res.state);
-        processEvents(res.events);
+        const res = Engine.skipPomodoro(root.getEngineSnapshot(), Date.now());
+        root.applyEngineState(res.state);
+        root.processEvents(res.events);
     }
 
     function start() {
-        if (!root.running) startPause();
+        if (!root.running) root.startPause();
     }
 
     // =========================================================================
     // Setters & Mutators
     // =========================================================================
     function setCountdownMinutes(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.COUNTDOWN_MINUTES_MIN, Math.min(Engine.LIMITS.COUNTDOWN_MINUTES_MAX, Number(value) || 0));
+        const v = Math.max(Engine.LIMITS.COUNTDOWN_MINUTES_MIN, Math.min(Engine.LIMITS.COUNTDOWN_MINUTES_MAX, Number(value) || 0));
         if (root.countdownMinutes === v) return;
         root.countdownMinutes = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("countdownMinutes", v);
-        if (!root.running && root.mode === root.countdownMode) reset();
+        if (!root.running && root.mode === root.countdownMode) root.reset();
     }
 
     function setCountdownSeconds(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.COUNTDOWN_SECONDS_MIN, Math.min(Engine.LIMITS.COUNTDOWN_SECONDS_MAX, Number(value) || 0));
+        const v = Math.max(Engine.LIMITS.COUNTDOWN_SECONDS_MIN, Math.min(Engine.LIMITS.COUNTDOWN_SECONDS_MAX, Number(value) || 0));
         if (root.countdownSeconds === v) return;
         root.countdownSeconds = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("countdownSeconds", v);
-        if (!root.running && root.mode === root.countdownMode) reset();
+        if (!root.running && root.mode === root.countdownMode) root.reset();
     }
 
     function setCountdownFullscreenEnabled(enabled, notifyHost) {
-        var b = Boolean(enabled);
+        const b = Boolean(enabled);
         if (root.countdownFullscreenEnabled === b) return;
         root.countdownFullscreenEnabled = b;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("countdownFullscreenEnabled", b);
     }
 
     function setCountdownMessage(message, notifyHost) {
-        var cleaned = String(message || "").trim();
-        var msg = cleaned === "" ? "Take a break" : cleaned;
+        const cleaned = String(message || "").trim();
+        const msg = cleaned === "" ? "Take a break" : cleaned;
         if (root.countdownMessage === msg) return;
         root.countdownMessage = msg;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("countdownMessage", msg);
     }
 
     function setAlarmHour(value) {
-        var v = Math.max(Engine.LIMITS.ALARM_HOUR_MIN, Math.min(Engine.LIMITS.ALARM_HOUR_MAX, Number(value) || 0));
+        const v = Math.max(Engine.LIMITS.ALARM_HOUR_MIN, Math.min(Engine.LIMITS.ALARM_HOUR_MAX, Number(value) || 0));
         if (root.alarmHour === v) return;
         root.alarmHour = v;
-        if (!root.running && root.mode === root.alarmMode) reset();
+        if (!root.running && root.mode === root.alarmMode) root.reset();
     }
 
     function setAlarmMinute(value) {
-        var v = Math.max(Engine.LIMITS.ALARM_MINUTE_MIN, Math.min(Engine.LIMITS.ALARM_MINUTE_MAX, Number(value) || 0));
+        const v = Math.max(Engine.LIMITS.ALARM_MINUTE_MIN, Math.min(Engine.LIMITS.ALARM_MINUTE_MAX, Number(value) || 0));
         if (root.alarmMinute === v) return;
         root.alarmMinute = v;
-        if (!root.running && root.mode === root.alarmMode) reset();
+        if (!root.running && root.mode === root.alarmMode) root.reset();
     }
 
     function setAlarmDisplayHour(value) {
-        var v = Engine.convert12To24(value, root.alarmMeridiem);
+        const v = Engine.convert12To24(value, root.alarmMeridiem);
         if (root.alarmHour === v) return;
         root.alarmHour = v;
-        if (!root.running && root.mode === root.alarmMode) reset();
+        if (!root.running && root.mode === root.alarmMode) root.reset();
     }
 
     function setAlarmMeridiem(value) {
-        var v = Engine.convert12To24(root.alarmDisplayHour, value);
+        const v = Engine.convert12To24(root.alarmDisplayHour, value);
         if (root.alarmHour === v) return;
         root.alarmHour = v;
-        if (!root.running && root.mode === root.alarmMode) reset();
+        if (!root.running && root.mode === root.alarmMode) root.reset();
     }
 
     function setAlarmUses12Hour(enabled, notifyHost) {
-        var b = Boolean(enabled);
+        const b = Boolean(enabled);
         if (root.alarmUses12Hour === b) return;
         root.alarmUses12Hour = b;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("alarmUses12Hour", b);
     }
 
     function setAlarmSound(value, notifyHost) {
-        var next = String(value || "");
+        let next = String(value || "");
         if (Engine.ALARM_SOUNDS.indexOf(next) === -1) {
             next = Engine.ALARM_SOUNDS[0];
         }
@@ -409,90 +569,90 @@ Item {
     }
 
     function cycleAlarmSound(direction, notifyHost) {
-        var dir = direction === undefined ? 1 : Number(direction) || 0;
-        var next = Engine.cycleAlarmSound(root.alarmSound, dir);
+        const dir = direction === undefined ? 1 : Number(direction) || 0;
+        const next = Engine.cycleAlarmSound(root.alarmSound, dir);
         if (root.alarmSound === next) return;
         root.alarmSound = next;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("alarmSound", next);
     }
 
     function setAlarmMessage(message) {
-        var cleaned = String(message || "").trim();
+        const cleaned = String(message || "").trim();
         root.alarmMessage = cleaned === "" ? "Alarm" : cleaned;
     }
 
     function setIntervalRounds(value) {
-        var v = Math.max(Engine.LIMITS.INTERVAL_ROUNDS_MIN, Math.min(Engine.LIMITS.INTERVAL_ROUNDS_MAX, Number(value) || 1));
+        const v = Math.max(Engine.LIMITS.INTERVAL_ROUNDS_MIN, Math.min(Engine.LIMITS.INTERVAL_ROUNDS_MAX, Number(value) || 1));
         if (root.intervalRounds === v) return;
         root.intervalRounds = v;
-        if (!root.running && root.mode === root.intervalsMode) reset();
+        if (!root.running && root.mode === root.intervalsMode) root.reset();
     }
 
     function setIntervalMinutes(value) {
-        var v = Math.max(Engine.LIMITS.INTERVAL_MINUTES_MIN, Math.min(Engine.LIMITS.INTERVAL_MINUTES_MAX, Number(value) || 0));
-        var s = root.intervalSeconds;
+        const v = Math.max(Engine.LIMITS.INTERVAL_MINUTES_MIN, Math.min(Engine.LIMITS.INTERVAL_MINUTES_MAX, Number(value) || 0));
+        let s = root.intervalSeconds;
         if (v === 0 && s === 0) s = 1;
-        var changed = (root.intervalMinutes !== v || root.intervalSeconds !== s);
+        const changed = (root.intervalMinutes !== v || root.intervalSeconds !== s);
         root.intervalMinutes = v;
         root.intervalSeconds = s;
-        if (changed && !root.running && root.mode === root.intervalsMode) reset();
+        if (changed && !root.running && root.mode === root.intervalsMode) root.reset();
     }
 
     function setIntervalSeconds(value) {
-        var v = Math.max(Engine.LIMITS.INTERVAL_SECONDS_MIN, Math.min(Engine.LIMITS.INTERVAL_SECONDS_MAX, Number(value) || 0));
-        var m = root.intervalMinutes;
+        const v = Math.max(Engine.LIMITS.INTERVAL_SECONDS_MIN, Math.min(Engine.LIMITS.INTERVAL_SECONDS_MAX, Number(value) || 0));
+        let m = root.intervalMinutes;
         if (m === 0 && v === 0) v = 1;
-        var changed = (root.intervalSeconds !== v || root.intervalMinutes !== m);
+        const changed = (root.intervalSeconds !== v || root.intervalMinutes !== m);
         root.intervalSeconds = v;
         root.intervalMinutes = m;
-        if (changed && !root.running && root.mode === root.intervalsMode) reset();
+        if (changed && !root.running && root.mode === root.intervalsMode) root.reset();
     }
 
     function setPomodoroWorkMinutes(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.POMODORO_WORK_MIN, Math.min(Engine.LIMITS.POMODORO_WORK_MAX, Number(value) || 1));
+        const v = Math.max(Engine.LIMITS.POMODORO_WORK_MIN, Math.min(Engine.LIMITS.POMODORO_WORK_MAX, Number(value) || 1));
         if (root.pomodoroWorkMinutes === v) return;
         root.pomodoroWorkMinutes = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("pomodoroWorkMinutes", v);
-        if (!root.running && root.mode === root.pomodoroMode) reset();
+        if (!root.running && root.mode === root.pomodoroMode) root.reset();
     }
 
     function setPomodoroShortBreakMinutes(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.POMODORO_SHORT_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_SHORT_BREAK_MAX, Number(value) || 1));
+        const v = Math.max(Engine.LIMITS.POMODORO_SHORT_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_SHORT_BREAK_MAX, Number(value) || 1));
         if (root.pomodoroShortBreakMinutes === v) return;
         root.pomodoroShortBreakMinutes = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("pomodoroShortBreakMinutes", v);
-        if (!root.running && root.mode === root.pomodoroMode) reset();
+        if (!root.running && root.mode === root.pomodoroMode) root.reset();
     }
 
     function setPomodoroCycles(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.POMODORO_CYCLES_MIN, Math.min(Engine.LIMITS.POMODORO_CYCLES_MAX, Number(value) || 1));
+        const v = Math.max(Engine.LIMITS.POMODORO_CYCLES_MIN, Math.min(Engine.LIMITS.POMODORO_CYCLES_MAX, Number(value) || 1));
         if (root.pomodoroCycles === v) return;
         root.pomodoroCycles = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("pomodoroCycles", v);
-        if (!root.running && root.mode === root.pomodoroMode) reset();
+        if (!root.running && root.mode === root.pomodoroMode) root.reset();
     }
 
     function setPomodoroLongBreakMinutes(value, notifyHost) {
-        var v = Math.max(Engine.LIMITS.POMODORO_LONG_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_LONG_BREAK_MAX, Number(value) || 1));
+        const v = Math.max(Engine.LIMITS.POMODORO_LONG_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_LONG_BREAK_MAX, Number(value) || 1));
         if (root.pomodoroLongBreakMinutes === v) return;
         root.pomodoroLongBreakMinutes = v;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("pomodoroLongBreakMinutes", v);
-        if (!root.running && root.mode === root.pomodoroMode) reset();
+        if (!root.running && root.mode === root.pomodoroMode) root.reset();
     }
 
     function setPomodoroSoundEnabled(enabled, notifyHost) {
-        var b = Boolean(enabled);
+        const b = Boolean(enabled);
         if (root.pomodoroSoundEnabled === b) return;
         root.pomodoroSoundEnabled = b;
         if (notifyHost === undefined || notifyHost) root.settingSaveRequested("pomodoroSound", b);
     }
 
     function configurePomodoro(workMinutes, shortBreakMinutes, cycles, longBreakMinutes, soundEnabled, breakColor) {
-        var nextWork = Math.max(Engine.LIMITS.POMODORO_WORK_MIN, Math.min(Engine.LIMITS.POMODORO_WORK_MAX, Number(workMinutes) || 1));
-        var nextShort = Math.max(Engine.LIMITS.POMODORO_SHORT_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_SHORT_BREAK_MAX, Number(shortBreakMinutes) || 1));
-        var nextCycles = Math.max(Engine.LIMITS.POMODORO_CYCLES_MIN, Math.min(Engine.LIMITS.POMODORO_CYCLES_MAX, Number(cycles) || 1));
-        var nextLong = Math.max(Engine.LIMITS.POMODORO_LONG_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_LONG_BREAK_MAX, Number(longBreakMinutes) || 1));
-        var changed = nextWork !== root.pomodoroWorkMinutes
+        const nextWork = Math.max(Engine.LIMITS.POMODORO_WORK_MIN, Math.min(Engine.LIMITS.POMODORO_WORK_MAX, Number(workMinutes) || 1));
+        const nextShort = Math.max(Engine.LIMITS.POMODORO_SHORT_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_SHORT_BREAK_MAX, Number(shortBreakMinutes) || 1));
+        const nextCycles = Math.max(Engine.LIMITS.POMODORO_CYCLES_MIN, Math.min(Engine.LIMITS.POMODORO_CYCLES_MAX, Number(cycles) || 1));
+        const nextLong = Math.max(Engine.LIMITS.POMODORO_LONG_BREAK_MIN, Math.min(Engine.LIMITS.POMODORO_LONG_BREAK_MAX, Number(longBreakMinutes) || 1));
+        const changed = nextWork !== root.pomodoroWorkMinutes
             || nextShort !== root.pomodoroShortBreakMinutes
             || nextCycles !== root.pomodoroCycles
             || nextLong !== root.pomodoroLongBreakMinutes;
@@ -502,166 +662,7 @@ Item {
         root.pomodoroCycles = nextCycles;
         root.pomodoroLongBreakMinutes = nextLong;
         if (soundEnabled !== undefined) root.pomodoroSoundEnabled = Boolean(soundEnabled);
-        if (breakColor !== undefined) root.pomodoroBreakColor = String(breakColor || "#a6e3a1");
-        if (changed && !root.running && root.mode === root.pomodoroMode) reset();
-    }
-
-    // =========================================================================
-    // Timers
-    // =========================================================================
-    Timer {
-        id: tickTimer
-        interval: (root.popoutOpen && root.mode === root.stopwatchMode) ? 20 : 250
-        repeat: true
-        running: root.running
-        onTriggered: root.tick()
-    }
-
-    Timer {
-        id: completionBellTimer
-        interval: 600
-        repeat: false
-        onTriggered: root.playNextCompletionBell()
-    }
-
-    Timer {
-        id: alarmRingTimer
-        interval: 3000
-        repeat: true
-        onTriggered: {
-            if (Date.now() >= root.alarmRingEndsAt) {
-                root.stopAlarmRinging();
-                return;
-            }
-            root.playSound(root.alarmSound);
-        }
-    }
-
-    // =========================================================================
-    // Unified IPC Interface (Singleton: guarantees single registration across monitors)
-    // =========================================================================
-    IpcHandler {
-        target: "clockwork"
-
-        function stopwatch(): string {
-            root.selectMode(root.stopwatchMode);
-            root.startPause();
-            return "CLOCKWORK_STOPWATCH_STARTED";
-        }
-
-        function countdown(minutes: string, seconds: string): string {
-            var m = parseInt(minutes, 10);
-            var s = (seconds !== undefined && seconds !== "") ? parseInt(seconds, 10) : 0;
-            if (isNaN(m) || isNaN(s) || (m === 0 && s === 0) || m < 0 || s < 0) {
-                return "ERROR_INVALID_ARGUMENTS";
-            }
-            root.selectMode(root.countdownMode);
-            root.setCountdownMinutes(m);
-            root.setCountdownSeconds(s);
-            root.startPause();
-            return "CLOCKWORK_COUNTDOWN_STARTED";
-        }
-
-        function intervals(rounds: string, minutes: string, seconds: string): string {
-            var r = parseInt(rounds, 10);
-            var m = (minutes !== undefined && minutes !== "") ? parseInt(minutes, 10) : 0;
-            var s = (seconds !== undefined && seconds !== "") ? parseInt(seconds, 10) : 0;
-            if (isNaN(r) || isNaN(m) || isNaN(s) || r <= 0 || (m === 0 && s === 0)) {
-                return "ERROR_INVALID_ARGUMENTS";
-            }
-            root.selectMode(root.intervalsMode);
-            root.setIntervalRounds(r);
-            root.setIntervalMinutes(m);
-            root.setIntervalSeconds(s);
-            root.startPause();
-            return "CLOCKWORK_INTERVALS_STARTED";
-        }
-
-        function alarm(hour: string, minute: string, message: string): string {
-            var h = parseInt(hour, 10);
-            var m = (minute !== undefined && minute !== "") ? parseInt(minute, 10) : 0;
-            if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-                return "ERROR_INVALID_ARGUMENTS";
-            }
-            root.selectMode(root.alarmMode);
-            root.setAlarmHour(h);
-            root.setAlarmMinute(m);
-            if (typeof message !== "undefined" && message !== "") {
-                root.setAlarmMessage(message);
-            }
-            root.startPause();
-            return "CLOCKWORK_ALARM_ARMED";
-        }
-
-        function pomodoro(work: string, shortBreak: string, cycles: string, longBreak: string): string {
-            var w = (work !== undefined && work !== "") ? parseInt(work, 10) : root.pomodoroWorkMinutes;
-            var sb = (shortBreak !== undefined && shortBreak !== "") ? parseInt(shortBreak, 10) : root.pomodoroShortBreakMinutes;
-            var c = (cycles !== undefined && cycles !== "") ? parseInt(cycles, 10) : root.pomodoroCycles;
-            var lb = (longBreak !== undefined && longBreak !== "") ? parseInt(longBreak, 10) : root.pomodoroLongBreakMinutes;
-            if (isNaN(w) || isNaN(sb) || isNaN(c) || isNaN(lb) || w <= 0 || sb <= 0 || c <= 0 || lb <= 0) {
-                return "ERROR_INVALID_ARGUMENTS";
-            }
-            root.selectMode(root.pomodoroMode);
-            root.setPomodoroWorkMinutes(w);
-            root.setPomodoroShortBreakMinutes(sb);
-            root.setPomodoroCycles(c);
-            root.setPomodoroLongBreakMinutes(lb);
-            root.startPause();
-            return "CLOCKWORK_POMODORO_STARTED";
-        }
-
-        function start(): string {
-            if (root.running) return "CLOCKWORK_ALREADY_RUNNING";
-            root.start();
-            return "CLOCKWORK_STARTED";
-        }
-
-        function pause(): string {
-            if (!root.running) return "CLOCKWORK_ALREADY_PAUSED";
-            root.pause();
-            return "CLOCKWORK_PAUSED";
-        }
-
-        function toggle(): string {
-            root.startPause();
-            return root.running ? "CLOCKWORK_RUNNING" : "CLOCKWORK_PAUSED";
-        }
-
-        function reset(): string {
-            root.reset();
-            return "CLOCKWORK_RESET";
-        }
-
-        function skip(): string {
-            if (root.mode !== root.pomodoroMode) return "ERROR_NOT_POMODORO";
-            root.skipPomodoroPhase();
-            return "CLOCKWORK_POMODORO_SKIPPED";
-        }
-
-        function status(): string {
-            return JSON.stringify({
-                mode: root.modeName,
-                running: root.running,
-                completed: root.completed,
-                displayText: root.displayText,
-                statusText: root.statusText,
-                progress: root.progress
-            });
-        }
-
-        function open(): string {
-            root.openPopoutRequested();
-            return "CLOCKWORK_POPOUT_OPENED";
-        }
-
-        function togglePopout(): string {
-            root.togglePopoutRequested();
-            return "CLOCKWORK_POPOUT_TOGGLED";
-        }
-
-        function close(): string {
-            root.closePopoutRequested();
-            return "CLOCKWORK_POPOUT_CLOSED";
-        }
+        if (breakColor !== undefined) root.pomodoroBreakColor = breakColor;
+        if (changed && !root.running && root.mode === root.pomodoroMode) root.reset();
     }
 }

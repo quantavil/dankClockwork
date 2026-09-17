@@ -5,13 +5,13 @@
 // Compatible with both QML (.pragma library) and Node.js (CommonJS module.exports)
 
 // Mode Constants
-var MODE_STOPWATCH = 0;
-var MODE_COUNTDOWN = 1;
-var MODE_INTERVALS = 2;
-var MODE_ALARM = 3;
-var MODE_POMODORO = 4;
+const MODE_STOPWATCH = 0;
+const MODE_COUNTDOWN = 1;
+const MODE_INTERVALS = 2;
+const MODE_ALARM = 3;
+const MODE_POMODORO = 4;
 
-var MODES = {
+const MODES = {
   STOPWATCH: 0,
   COUNTDOWN: 1,
   INTERVALS: 2,
@@ -24,13 +24,13 @@ var MODES = {
   4: "POMODORO"
 };
 
-var ALARM_SOUNDS = [
+const ALARM_SOUNDS = [
   "alarm-clock-elapsed.oga",
   "bell.oga",
   "phone-incoming-call.oga"
 ];
 
-var LIMITS = {
+const LIMITS = {
   POMODORO_WORK_MIN: 1,
   POMODORO_WORK_MAX: 120,
   POMODORO_SHORT_BREAK_MIN: 1,
@@ -60,14 +60,14 @@ var LIMITS = {
 // ============================================================================
 
 function pad2(value) {
-  var v = Math.floor(Number(value) || 0);
+  let v = Math.floor(Number(value) || 0);
   if (v < 0) v = 0;
   return v < 10 ? "0" + v : String(v);
 }
 
 function formatTime(milliseconds, showCentiseconds, useCeil) {
-  var safeMilliseconds = Math.max(0, Math.floor(Number(milliseconds) || 0));
-  var totalSeconds;
+  const safeMilliseconds = Math.max(0, Math.floor(Number(milliseconds) || 0));
+  let totalSeconds;
 
   if (showCentiseconds) {
     totalSeconds = Math.floor(safeMilliseconds / 1000);
@@ -77,16 +77,16 @@ function formatTime(milliseconds, showCentiseconds, useCeil) {
     totalSeconds = Math.floor(safeMilliseconds / 1000);
   }
 
-  var hours = Math.floor(totalSeconds / 3600);
-  var minutes = Math.floor((totalSeconds % 3600) / 60);
-  var seconds = totalSeconds % 60;
-  var mm = pad2(minutes);
-  var ss = pad2(seconds);
-  var result = hours > 0 ? hours + ":" + mm + ":" + ss : mm + ":" + ss;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const mm = pad2(minutes);
+  const ss = pad2(seconds);
+  const result = hours > 0 ? hours + ":" + mm + ":" + ss : mm + ":" + ss;
 
   if (!showCentiseconds) return result;
 
-  var centiseconds = Math.floor((safeMilliseconds % 1000) / 10);
+  const centiseconds = Math.floor((safeMilliseconds % 1000) / 10);
   return result + "." + pad2(centiseconds);
 }
 
@@ -95,10 +95,10 @@ function formatTime(milliseconds, showCentiseconds, useCeil) {
 // ============================================================================
 
 function cycleAlarmSound(currentSound, direction) {
-  var dir = direction === undefined ? 1 : Number(direction) || 0;
-  var index = ALARM_SOUNDS.indexOf(currentSound);
+  const dir = direction === undefined ? 1 : Number(direction) || 0;
+  let index = ALARM_SOUNDS.indexOf(currentSound);
   if (index < 0) index = 0;
-  var nextIndex = (index + dir) % ALARM_SOUNDS.length;
+  let nextIndex = (index + dir) % ALARM_SOUNDS.length;
   if (nextIndex < 0) nextIndex += ALARM_SOUNDS.length;
   return ALARM_SOUNDS[nextIndex];
 }
@@ -114,35 +114,35 @@ function getAlarmSoundName(soundFile) {
 // ============================================================================
 
 function convert24To12(hour24) {
-  var h = Math.max(0, Math.min(23, Number(hour24) || 0));
-  var displayHour = h % 12 === 0 ? 12 : h % 12;
-  var meridiem = h >= 12 ? "PM" : "AM";
+  const h = Math.max(0, Math.min(23, Number(hour24) || 0));
+  const displayHour = h % 12 === 0 ? 12 : h % 12;
+  const meridiem = h >= 12 ? "PM" : "AM";
   return { displayHour: displayHour, meridiem: meridiem };
 }
 
 function convert12To24(displayHour, meridiem) {
-  var h = Math.max(1, Math.min(12, Number(displayHour) || 12));
-  var isPM = String(meridiem || "").toUpperCase() === "PM";
+  const h = Math.max(1, Math.min(12, Number(displayHour) || 12));
+  const isPM = String(meridiem || "").toUpperCase() === "PM";
   return (h % 12) + (isPM ? 12 : 0);
 }
 
 function computeAlarmTarget(hour, minute, now, meridiem) {
-  var nowMs = typeof now === "number" ? now : (now instanceof Date ? now.getTime() : Date.now());
-  var targetHour = Number(hour) || 0;
+  const nowMs = typeof now === "number" ? now : (now instanceof Date ? now.getTime() : Date.now());
+  let targetHour = Number(hour) || 0;
 
   if (meridiem) {
     targetHour = convert12To24(targetHour, meridiem);
   }
 
-  var targetDate = new Date(nowMs);
+  const targetDate = new Date(nowMs);
   targetDate.setHours(targetHour, Number(minute) || 0, 0, 0);
 
   if (targetDate.getTime() <= nowMs) {
     targetDate.setDate(targetDate.getDate() + 1);
   }
 
-  var targetAt = targetDate.getTime();
-  var durationMs = Math.max(1, targetAt - nowMs);
+  const targetAt = targetDate.getTime();
+  const durationMs = Math.max(1, targetAt - nowMs);
 
   return {
     targetAt: targetAt,
@@ -155,43 +155,43 @@ function computeAlarmTarget(hour, minute, now, meridiem) {
 // ============================================================================
 
 function createInitialState(options) {
-  options = options || {};
+  const opt = options || {};
   return {
-    mode: options.mode !== undefined ? options.mode : MODE_STOPWATCH,
+    mode: opt.mode !== undefined ? opt.mode : MODE_STOPWATCH,
     running: false,
     completed: false,
     startedAt: 0,
     storedElapsedMs: 0,
-    nowMs: options.nowMs || 0,
+    nowMs: opt.nowMs || 0,
 
     // Countdown configuration
-    countdownMinutes: options.countdownMinutes !== undefined ? options.countdownMinutes : 5,
-    countdownSeconds: options.countdownSeconds !== undefined ? options.countdownSeconds : 0,
-    countdownMessage: options.countdownMessage || "Take a break",
-    countdownFullscreenEnabled: Boolean(options.countdownFullscreenEnabled),
+    countdownMinutes: opt.countdownMinutes !== undefined ? opt.countdownMinutes : 5,
+    countdownSeconds: opt.countdownSeconds !== undefined ? opt.countdownSeconds : 0,
+    countdownMessage: opt.countdownMessage || "Take a break",
+    countdownFullscreenEnabled: Boolean(opt.countdownFullscreenEnabled),
 
     // Intervals configuration
-    intervalRounds: options.intervalRounds !== undefined ? options.intervalRounds : 8,
-    intervalMinutes: options.intervalMinutes !== undefined ? options.intervalMinutes : 0,
-    intervalSeconds: options.intervalSeconds !== undefined ? options.intervalSeconds : 30,
+    intervalRounds: opt.intervalRounds !== undefined ? opt.intervalRounds : 8,
+    intervalMinutes: opt.intervalMinutes !== undefined ? opt.intervalMinutes : 0,
+    intervalSeconds: opt.intervalSeconds !== undefined ? opt.intervalSeconds : 30,
     notifiedIntervals: 0,
 
     // Alarm configuration
-    alarmHour: options.alarmHour !== undefined ? options.alarmHour : 7,
-    alarmMinute: options.alarmMinute !== undefined ? options.alarmMinute : 0,
-    alarmUses12Hour: Boolean(options.alarmUses12Hour),
-    alarmSound: options.alarmSound || "alarm-clock-elapsed.oga",
-    alarmMessage: options.alarmMessage || "Alarm",
+    alarmHour: opt.alarmHour !== undefined ? opt.alarmHour : 7,
+    alarmMinute: opt.alarmMinute !== undefined ? opt.alarmMinute : 0,
+    alarmUses12Hour: Boolean(opt.alarmUses12Hour),
+    alarmSound: opt.alarmSound || "alarm-clock-elapsed.oga",
+    alarmMessage: opt.alarmMessage || "Alarm",
     alarmTargetAt: 0,
     alarmTargetDurationMs: 0,
 
     // Pomodoro configuration
-    pomodoroWorkMinutes: options.pomodoroWorkMinutes !== undefined ? options.pomodoroWorkMinutes : 25,
-    pomodoroShortBreakMinutes: options.pomodoroShortBreakMinutes !== undefined ? options.pomodoroShortBreakMinutes : 5,
-    pomodoroCycles: options.pomodoroCycles !== undefined ? options.pomodoroCycles : 4,
-    pomodoroLongBreakMinutes: options.pomodoroLongBreakMinutes !== undefined ? options.pomodoroLongBreakMinutes : 15,
-    pomodoroSoundEnabled: options.pomodoroSoundEnabled !== undefined ? Boolean(options.pomodoroSoundEnabled) : true,
-    pomodoroBreakColor: options.pomodoroBreakColor || "#a6e3a1",
+    pomodoroWorkMinutes: opt.pomodoroWorkMinutes !== undefined ? opt.pomodoroWorkMinutes : 25,
+    pomodoroShortBreakMinutes: opt.pomodoroShortBreakMinutes !== undefined ? opt.pomodoroShortBreakMinutes : 5,
+    pomodoroCycles: opt.pomodoroCycles !== undefined ? opt.pomodoroCycles : 4,
+    pomodoroLongBreakMinutes: opt.pomodoroLongBreakMinutes !== undefined ? opt.pomodoroLongBreakMinutes : 15,
+    pomodoroSoundEnabled: opt.pomodoroSoundEnabled !== undefined ? Boolean(opt.pomodoroSoundEnabled) : true,
+    pomodoroBreakColor: opt.pomodoroBreakColor || "",
     pomodoroPhaseKind: "focus", // "focus" | "short-break" | "long-break"
     pomodoroCurrentCycle: 1,
     pomodoroCompletedCycles: 0,
@@ -204,22 +204,22 @@ function createInitialState(options) {
 // ============================================================================
 
 function getElapsedMs(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : (state.nowMs || Date.now());
+  const now = typeof nowMs === "number" ? nowMs : (state.nowMs || Date.now());
   if (state.running) {
-    var diff = Math.max(0, now - (state.startedAt || 0));
+    const diff = Math.max(0, now - (state.startedAt || 0));
     return Math.max(0, Math.round((state.storedElapsedMs || 0) + diff));
   }
   return Math.max(0, Math.round(state.storedElapsedMs || 0));
 }
 
 function getIntervalDurationMs(state) {
-  var mins = Math.max(0, state.intervalMinutes || 0);
-  var secs = Math.max(0, state.intervalSeconds || 0);
+  const mins = Math.max(0, state.intervalMinutes || 0);
+  const secs = Math.max(0, state.intervalSeconds || 0);
   return Math.max(1000, mins * 60000 + secs * 1000);
 }
 
 function getPomodoroPhaseDurationMs(state) {
-  var kind = state.pomodoroPhaseKind || "focus";
+  const kind = state.pomodoroPhaseKind || "focus";
   if (kind === "long-break") {
     return Math.max(1, state.pomodoroLongBreakMinutes || 15) * 60000;
   }
@@ -230,7 +230,7 @@ function getPomodoroPhaseDurationMs(state) {
 }
 
 function getTargetMs(state) {
-  var mode = state.mode;
+  const mode = state.mode;
   if (mode === MODE_COUNTDOWN) {
     return Math.max(0, (state.countdownMinutes || 0) * 60000 + (state.countdownSeconds || 0) * 1000);
   }
@@ -247,22 +247,22 @@ function getTargetMs(state) {
 }
 
 function getCurrentRound(state, nowMs) {
-  var elapsed = getElapsedMs(state, nowMs);
-  var duration = getIntervalDurationMs(state);
-  var rounds = Math.max(1, state.intervalRounds || 1);
+  const elapsed = getElapsedMs(state, nowMs);
+  const duration = getIntervalDurationMs(state);
+  const rounds = Math.max(1, state.intervalRounds || 1);
   return Math.min(rounds, Math.floor(elapsed / duration) + 1);
 }
 
 function getPomodoroPhase(state, nowMs) {
-  var kind = state.pomodoroPhaseKind || "focus";
-  var cycle = state.pomodoroCurrentCycle || 1;
-  var totalCycles = Math.max(1, state.pomodoroCycles || 4);
-  var completedCycles = state.pomodoroCompletedCycles || 0;
-  var duration = getPomodoroPhaseDurationMs(state);
-  var elapsed = Math.min(duration, getElapsedMs(state, nowMs));
-  var remaining = Math.max(0, duration - elapsed);
+  const kind = state.pomodoroPhaseKind || "focus";
+  const cycle = state.pomodoroCurrentCycle || 1;
+  const totalCycles = Math.max(1, state.pomodoroCycles || 4);
+  const completedCycles = state.pomodoroCompletedCycles || 0;
+  const duration = getPomodoroPhaseDurationMs(state);
+  const elapsed = Math.min(duration, getElapsedMs(state, nowMs));
+  const remaining = Math.max(0, duration - elapsed);
 
-  var label = "";
+  let label = "";
   if (kind === "focus") {
     label = "Focus " + cycle + " of " + totalCycles;
   } else if (kind === "long-break") {
@@ -297,16 +297,16 @@ function getProgress(state, nowMs) {
     return 0;
   }
   if (state.mode === MODE_POMODORO) {
-    var phase = getPomodoroPhase(state, nowMs);
+    const phase = getPomodoroPhase(state, nowMs);
     return phase.durationMs > 0 ? Math.min(1, phase.elapsedMs / phase.durationMs) : 0;
   }
-  var target = getTargetMs(state);
+  const target = getTargetMs(state);
   return target > 0 ? Math.min(1, getElapsedMs(state, nowMs) / target) : 0;
 }
 
 function getAlarmTimeText(state) {
   if (state.alarmUses12Hour) {
-    var conv = convert24To12(state.alarmHour);
+    const conv = convert24To12(state.alarmHour);
     return conv.displayHour + ":" + pad2(state.alarmMinute) + " " + conv.meridiem;
   }
   return pad2(state.alarmHour) + ":" + pad2(state.alarmMinute);
@@ -334,15 +334,15 @@ function getStatusText(state, nowMs) {
   }
 
   if (state.mode === MODE_POMODORO) {
-    var phase = getPomodoroPhase(state, nowMs);
+    const phase = getPomodoroPhase(state, nowMs);
     if (state.running) return phase.label;
     if (state.pomodoroSessionStarted) return "Paused · " + phase.label;
     return state.pomodoroCycles + " cycles · " + state.pomodoroWorkMinutes + " / " + state.pomodoroShortBreakMinutes + " min";
   }
 
   if (state.mode === MODE_INTERVALS) {
-    var round = getCurrentRound(state, nowMs);
-    var durationText = pad2(state.intervalMinutes) + ":" + pad2(state.intervalSeconds);
+    const round = getCurrentRound(state, nowMs);
+    const durationText = pad2(state.intervalMinutes) + ":" + pad2(state.intervalSeconds);
     return "Round " + round + " of " + state.intervalRounds + " · " + durationText;
   }
 
@@ -361,14 +361,14 @@ function getDisplayText(state, nowMs) {
   if (state.mode === MODE_ALARM && !state.running && state.storedElapsedMs === 0 && !state.completed) {
     return getAlarmTimeText(state);
   }
-  var useCeil = state.mode !== MODE_STOPWATCH;
+  const useCeil = state.mode !== MODE_STOPWATCH;
   return formatTime(getDisplayMs(state, nowMs), state.mode === MODE_STOPWATCH, useCeil);
 }
 
 function getBarTimeText(state, nowMs) {
   if (state.running || state.storedElapsedMs > 0 || state.completed ||
       (state.mode === MODE_POMODORO && state.pomodoroSessionStarted)) {
-    var useCeil = state.mode !== MODE_STOPWATCH;
+    const useCeil = state.mode !== MODE_STOPWATCH;
     return formatTime(getDisplayMs(state, nowMs), false, useCeil);
   }
   return "";
@@ -379,9 +379,9 @@ function getBarTimeText(state, nowMs) {
 // ============================================================================
 
 function startPause(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : Date.now();
-  var next = Object.assign({}, state);
-  var events = [];
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  let next = Object.assign({}, state);
+  const events = [];
 
   if (next.running) {
     if (next.mode === MODE_ALARM) {
@@ -395,7 +395,7 @@ function startPause(state, nowMs) {
   }
 
   if (next.mode === MODE_ALARM) {
-    var target = computeAlarmTarget(next.alarmHour, next.alarmMinute, now);
+    const target = computeAlarmTarget(next.alarmHour, next.alarmMinute, now);
     next.alarmTargetAt = target.targetAt;
     next.alarmTargetDurationMs = target.durationMs;
     next.storedElapsedMs = 0;
@@ -419,8 +419,8 @@ function startPause(state, nowMs) {
 }
 
 function pause(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : Date.now();
-  var next = Object.assign({}, state);
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  const next = Object.assign({}, state);
   if (!next.running) {
     return { state: next, events: [] };
   }
@@ -431,8 +431,8 @@ function pause(state, nowMs) {
 }
 
 function reset(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : Date.now();
-  var next = Object.assign({}, state);
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  const next = Object.assign({}, state);
   next.running = false;
   next.completed = false;
   next.storedElapsedMs = 0;
@@ -456,19 +456,19 @@ function reset(state, nowMs) {
 }
 
 function selectMode(state, nextMode, nowMs) {
-  var modeNum = Math.max(MODE_STOPWATCH, Math.min(MODE_POMODORO, Number(nextMode) || 0));
+  const modeNum = Math.max(MODE_STOPWATCH, Math.min(MODE_POMODORO, Number(nextMode) || 0));
   if (modeNum === state.mode) {
     return { state: state, events: [] };
   }
-  var next = Object.assign({}, state);
+  const next = Object.assign({}, state);
   next.mode = modeNum;
   return reset(next, nowMs);
 }
 
 function tick(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : Date.now();
-  var next = Object.assign({}, state);
-  var events = [];
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  const next = Object.assign({}, state);
+  const events = [];
   next.nowMs = now;
 
   if (!next.running) {
@@ -479,11 +479,11 @@ function tick(state, nowMs) {
     return { state: next, events: [] };
   }
 
-  var elapsed = getElapsedMs(next, now);
+  const elapsed = getElapsedMs(next, now);
 
   if (next.mode === MODE_INTERVALS) {
-    var duration = getIntervalDurationMs(next);
-    var passed = Math.min(next.intervalRounds, Math.floor(elapsed / duration));
+    const duration = getIntervalDurationMs(next);
+    const passed = Math.min(next.intervalRounds, Math.floor(elapsed / duration));
     if (passed > (next.notifiedIntervals || 0) && passed < next.intervalRounds) {
       next.notifiedIntervals = passed;
       events.push({ type: "sound", file: "complete.oga" });
@@ -494,7 +494,7 @@ function tick(state, nowMs) {
       });
     }
 
-    var totalTarget = Math.max(1, next.intervalRounds) * duration;
+    const totalTarget = Math.max(1, next.intervalRounds) * duration;
     if (elapsed >= totalTarget) {
       next.storedElapsedMs = totalTarget;
       next.running = false;
@@ -511,11 +511,11 @@ function tick(state, nowMs) {
   }
 
   if (next.mode === MODE_POMODORO) {
-    var phaseDuration = getPomodoroPhaseDurationMs(next);
+    const phaseDuration = getPomodoroPhaseDurationMs(next);
     if (elapsed >= phaseDuration) {
       if (next.pomodoroPhaseKind === "focus") {
         next.pomodoroCompletedCycles = Math.min(next.pomodoroCycles, (next.pomodoroCompletedCycles || 0) + 1);
-        var isLongBreak = next.pomodoroCompletedCycles >= next.pomodoroCycles;
+        const isLongBreak = next.pomodoroCompletedCycles >= next.pomodoroCycles;
         next.pomodoroPhaseKind = isLongBreak ? "long-break" : "short-break";
         next.pomodoroCurrentCycle = next.pomodoroCompletedCycles;
         next.storedElapsedMs = 0;
@@ -571,7 +571,7 @@ function tick(state, nowMs) {
   }
 
   if (next.mode === MODE_ALARM) {
-    var alarmTarget = next.alarmTargetDurationMs || 0;
+    const alarmTarget = next.alarmTargetDurationMs || 0;
     if (elapsed >= alarmTarget || (next.alarmTargetAt > 0 && now >= next.alarmTargetAt)) {
       next.storedElapsedMs = alarmTarget;
       next.running = false;
@@ -587,7 +587,7 @@ function tick(state, nowMs) {
   }
 
   // MODE_COUNTDOWN
-  var countdownTarget = getTargetMs(next);
+  const countdownTarget = getTargetMs(next);
   if (elapsed >= countdownTarget) {
     next.storedElapsedMs = countdownTarget;
     next.running = false;
@@ -604,17 +604,17 @@ function tick(state, nowMs) {
 }
 
 function skipPomodoro(state, nowMs) {
-  var now = typeof nowMs === "number" ? nowMs : Date.now();
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
   if (state.mode !== MODE_POMODORO || !state.pomodoroSessionStarted || state.completed) {
     return { state: state, events: [] };
   }
 
-  var next = Object.assign({}, state);
-  var events = [];
+  let next = Object.assign({}, state);
+  const events = [];
 
   if (next.pomodoroPhaseKind === "focus") {
     next.pomodoroCompletedCycles = Math.min(next.pomodoroCycles, (next.pomodoroCompletedCycles || 0) + 1);
-    var isLongBreak = next.pomodoroCompletedCycles >= next.pomodoroCycles;
+    const isLongBreak = next.pomodoroCompletedCycles >= next.pomodoroCycles;
     next.pomodoroPhaseKind = isLongBreak ? "long-break" : "short-break";
     next.pomodoroCurrentCycle = next.pomodoroCompletedCycles;
     next.storedElapsedMs = 0;
@@ -649,7 +649,7 @@ function skipPomodoro(state, nowMs) {
   }
 
   // long-break
-  var phaseDuration = getPomodoroPhaseDurationMs(next);
+  const phaseDuration = getPomodoroPhaseDurationMs(next);
   next.storedElapsedMs = phaseDuration;
   next.running = false;
   next.completed = true;

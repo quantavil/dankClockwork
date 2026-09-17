@@ -26,6 +26,10 @@ IMPORT_ARGS=("-I" "$ROOT_DIR")
 if [ -d "/usr/lib/qt6/qml" ]; then
     IMPORT_ARGS+=("-I" "/usr/lib/qt6/qml")
 fi
+DMS_DIR=$(find "/run/user/$(id -u)/danklinux-shell" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -n 1 || true)
+if [ -n "$DMS_DIR" ] && [ -d "$DMS_DIR" ]; then
+    IMPORT_ARGS+=("-I" "$DMS_DIR")
+fi
 
 # 3. List of components to validate
 QML_FILES=(

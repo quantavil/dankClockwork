@@ -38,5 +38,4 @@ dist/
 .cache/
 
 # Internal documentation and audits
-AGENT.md
 audit.md

@@ -13,6 +13,8 @@ Column {
     property int from: 0
     property int to: 999
 
+    readonly property bool isVisualActive: editor.activeFocus
+
     // =========================================================================
     // Signals
     // =========================================================================
@@ -23,8 +25,6 @@ Column {
     // Layout Settings
     // =========================================================================
     spacing: Theme.spacingXS
-
-    readonly property bool isVisualActive: editor.activeFocus
 
     // =========================================================================
     // Label
@@ -57,9 +57,9 @@ Column {
             ColorAnimation { duration: 150 }
         }
 
-        // Mouse scroll adjustment
+        // Mouse scroll adjustment (Mouse only to avoid precision touchpad runaway)
         WheelHandler {
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            acceptedDevices: PointerDevice.Mouse
             enabled: root.enabled
             onWheel: event => {
                 if (event.angleDelta.y > 0) {
@@ -118,22 +118,9 @@ Column {
             anchors.bottom: parent.bottom
             clip: true
 
-            StyledText {
-                id: valueDisplay
-                anchors.centerIn: parent
-                visible: !editor.activeFocus
-                text: String(root.value)
-                font.pixelSize: Theme.fontSizeMedium
-                font.weight: Font.Bold
-                color: root.isVisualActive ? Theme.primary : Theme.surfaceText
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
             TextInput {
                 id: editor
                 anchors.fill: parent
-                visible: activeFocus
                 text: String(root.value)
                 font.pixelSize: Theme.fontSizeMedium
                 font.family: Theme.fontFamily
@@ -146,10 +133,15 @@ Column {
                 selectByMouse: true
                 inputMethodHints: Qt.ImhDigitsOnly
                 validator: IntValidator {
-                    bottom: root.from
+                    bottom: 0
                     top: root.to
                 }
-                clip: true
+
+                onActiveFocusChanged: {
+                    if (activeFocus) {
+                        selectAll();
+                    }
+                }
 
                 onEditingFinished: root.commitEditor()
 
@@ -168,19 +160,6 @@ Column {
                 }
                 Keys.onUpPressed: root.stepUp()
                 Keys.onDownPressed: root.stepDown()
-            }
-
-            MouseArea {
-                id: textClickArea
-                anchors.fill: parent
-                visible: !editor.activeFocus
-                cursorShape: Qt.IBeamCursor
-                hoverEnabled: true
-                onClicked: {
-                    editor.text = String(root.value);
-                    editor.forceActiveFocus();
-                    editor.selectAll();
-                }
             }
         }
 
@@ -225,41 +204,8 @@ Column {
     }
 
     // =========================================================================
-    // Helper Methods & Stepper Timer Logic
+    // Stepper Timers & Helper Logic
     // =========================================================================
-    onValueChanged: {
-        if (!editor.activeFocus) {
-            editor.text = String(root.value);
-        }
-    }
-
-    function commitEditor() {
-        var parsed = parseInt(editor.text, 10);
-        if (isNaN(parsed)) {
-            parsed = root.value;
-        }
-        var clamped = Math.max(root.from, Math.min(root.to, parsed));
-        if (clamped !== root.value) {
-            root.modified(clamped);
-        }
-        editor.text = Qt.binding(() => String(root.value));
-        root.editingFinished();
-    }
-
-    function stepUp() {
-        var newVal = Math.min(root.to, root.value + 1);
-        if (newVal !== root.value) {
-            root.modified(newVal);
-        }
-    }
-
-    function stepDown() {
-        var newVal = Math.max(root.from, root.value - 1);
-        if (newVal !== root.value) {
-            root.modified(newVal);
-        }
-    }
-
     Timer {
         id: stepRepeatTimer
         interval: 80
@@ -278,6 +224,31 @@ Column {
         onTriggered: {
             stepRepeatTimer.stepAction = stepAction;
             stepRepeatTimer.start();
+        }
+    }
+
+    function commitEditor() {
+        const parsed = parseInt(editor.text, 10);
+        const resolved = isNaN(parsed) ? root.value : parsed;
+        const clamped = Math.max(root.from, Math.min(root.to, resolved));
+        if (clamped !== root.value) {
+            root.modified(clamped);
+        }
+        editor.text = Qt.binding(() => String(root.value));
+        root.editingFinished();
+    }
+
+    function stepUp() {
+        const newVal = Math.min(root.to, root.value + 1);
+        if (newVal !== root.value) {
+            root.modified(newVal);
+        }
+    }
+
+    function stepDown() {
+        const newVal = Math.max(root.from, root.value - 1);
+        if (newVal !== root.value) {
+            root.modified(newVal);
         }
     }
 

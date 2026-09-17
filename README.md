@@ -42,7 +42,7 @@ Clockwork combines five essential time-tracking tools into a single compact bar 
 
 ### 5. Pomodoro (Focus & Break Cycles)
 - **Focus Phase**: Configurable work duration (default: 25 min). Displays the `work` icon on the bar pill and popout. Chimes `complete.oga` upon focus session completion.
-- **Break Phases**: Alternates between short breaks (default: 5 min) and a long break (default: 15 min after target cycle count, default: 4). Automatically switches to the `emoji_food_beverage` (tea cup) icon and soft green accent color (`#a6e3a1`). Chimes `bell.oga` upon break completion.
+- **Break Phases**: Alternates between short breaks (default: 5 min) and a long break (default: 15 min after target cycle count, default: 4). Automatically switches to the `emoji_food_beverage` (tea cup) icon and dynamic Material 3 accent tokens (`Theme.secondary`) for seamless light/dark contrast. Chimes `bell.oga` upon break completion.
 - **Phase Skipping**: Advance between focus and break immediately via the popout button, `S` key shortcut, or IPC (`dms ipc call clockwork skip`).
 
 ---
@@ -143,11 +143,12 @@ All preferences can be configured in DMS Settings (**Mod+,** or via Control Cent
 
 ### 2. Alarm Preferences
 - **12-Hour Clock Format**: Display and edit alarm times using 12-hour AM/PM format (default: 24-hour).
-- **Alarm Sound**: Audio ringtone played when alarm triggers (`alarm-clock-elapsed.oga`, `bell.oga`, or `phone-incoming-call.oga`).
+- **Alarm Sound**: Audio ringtone played when alarm triggers (`alarm-clock-elapsed.oga`, `bell.oga`, or `phone-incoming-call.oga`) with live preview on selection.
+- **Ringing Alarm Dismissal**: When ringing, an urgent "Stop Alarm" action button appears directly in the popout header, or it can be silenced via Right-Click on the bar pill or pressing `R` / `Space`.
 
 ### 3. Countdown & General
-- **Default Countdown Duration**: Default duration for countdown timer (1–180 min, default: 5 min).
-- **Fullscreen Break View**: Automatically show fullscreen break overlay when countdown completes (default: disabled).
+- **Default Countdown Duration**: Default duration for countdown timer (minutes and seconds).
+- **Fullscreen Break View**: Automatically show fullscreen break overlay when countdown completes (default: disabled, multi-monitor safe).
 - **Break Message**: Custom reminder text displayed on countdown and break screens (default: "Take a break").
 - **Show Remaining Time in Bar**: Show countdown and timer text in the DankBar widget pill (default: enabled).
 

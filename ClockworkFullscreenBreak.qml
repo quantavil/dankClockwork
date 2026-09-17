@@ -8,20 +8,27 @@ import "." as ClockworkCore
 PanelWindow {
     id: root
 
+    // =========================================================================
+    // Properties
+    // =========================================================================
     property var targetScreen: null
-    screen: targetScreen
-
     property bool active: false
-    visible: active
-
     property string message: (ClockworkCore.ClockworkState.countdownMessage && ClockworkCore.ClockworkState.countdownMessage.trim() !== "")
         ? ClockworkCore.ClockworkState.countdownMessage
-        : I18n.tr("Take a break")
+        : I18n.trFor("clockwork", "Take a break")
 
+    // =========================================================================
+    // Signals
+    // =========================================================================
     signal closeRequested()
     signal toggleRequested()
     signal resetRequested()
 
+    // =========================================================================
+    // Window Configuration
+    // =========================================================================
+    screen: targetScreen
+    visible: active
     color: "transparent"
 
     WlrLayershell.namespace: "dms:clockwork-break"
@@ -52,6 +59,7 @@ PanelWindow {
 
         MouseArea {
             anchors.fill: parent
+            onClicked: keyCatcher.forceActiveFocus()
         }
     }
 
@@ -64,10 +72,10 @@ PanelWindow {
             if (event.key === Qt.Key_Escape) {
                 root.closeRequested();
                 event.accepted = true;
-            } else if (event.key === Qt.Key_Space) {
+            } else if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 root.toggleRequested();
                 event.accepted = true;
-            } else if (event.key === Qt.Key_R) {
+            } else if (event.key === Qt.Key_R || event.text === "r" || event.text === "R") {
                 root.resetRequested();
                 event.accepted = true;
             }
@@ -81,7 +89,7 @@ PanelWindow {
             iconName: "close"
             iconSize: 24
             iconColor: Theme.surfaceText
-            tooltipText: I18n.tr("Close (Esc)")
+            tooltipText: I18n.trFor("clockwork", "Close (Esc)")
             onClicked: root.closeRequested()
         }
 
@@ -155,8 +163,8 @@ PanelWindow {
 
                 DankButton {
                     text: ClockworkCore.ClockworkState.running
-                        ? I18n.tr("Pause")
-                        : (ClockworkCore.ClockworkState.completed ? I18n.tr("Restart") : I18n.tr("Resume"))
+                        ? I18n.trFor("clockwork", "Pause")
+                        : (ClockworkCore.ClockworkState.completed ? I18n.trFor("clockwork", "Restart") : I18n.trFor("clockwork", "Resume"))
                     iconName: ClockworkCore.ClockworkState.running ? "pause" : "play_arrow"
                     backgroundColor: Theme.primary
                     textColor: Theme.primaryText
@@ -164,7 +172,7 @@ PanelWindow {
                 }
 
                 DankButton {
-                    text: I18n.tr("Reset")
+                    text: I18n.trFor("clockwork", "Reset")
                     iconName: "restart_alt"
                     backgroundColor: Theme.surfaceContainerHighest
                     textColor: Theme.surfaceText
@@ -172,7 +180,7 @@ PanelWindow {
                 }
 
                 DankButton {
-                    text: I18n.tr("Close")
+                    text: I18n.trFor("clockwork", "Close")
                     iconName: "close"
                     backgroundColor: Theme.surfaceContainerHighest
                     textColor: Theme.surfaceText

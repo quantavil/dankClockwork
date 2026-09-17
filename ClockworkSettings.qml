@@ -17,14 +17,14 @@ PluginSettings {
         spacing: Theme.spacingXS
 
         StyledText {
-            text: I18n.tr("Clockwork Settings")
+            text: I18n.trFor("clockwork", "Clockwork Settings")
             font.pixelSize: Theme.fontSizeXLarge
             font.weight: Font.Bold
             color: Theme.surfaceText
         }
 
         StyledText {
-            text: I18n.tr("Configure Pomodoro intervals, alarm preferences, and countdown behavior.")
+            text: I18n.trFor("clockwork", "Configure Pomodoro intervals, alarm preferences, and countdown behavior.")
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
             width: parent.width
@@ -38,7 +38,7 @@ PluginSettings {
     StyledRect {
         id: pomodoroCard
         width: parent.width
-        height: pomodoroCol.implicitHeight + Theme.spacingL * 2
+        implicitHeight: pomodoroCol.implicitHeight + Theme.spacingL * 2
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh
 
@@ -59,7 +59,7 @@ PluginSettings {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 StyledText {
-                    text: I18n.tr("Pomodoro Preferences")
+                    text: I18n.trFor("clockwork", "Pomodoro Preferences")
                     font.pixelSize: Theme.fontSizeLarge
                     font.weight: Font.Medium
                     color: Theme.surfaceText
@@ -69,8 +69,8 @@ PluginSettings {
 
             SliderSetting {
                 settingKey: "pomodoroWorkMinutes"
-                label: I18n.tr("Work Duration")
-                description: I18n.tr("Duration of focus work intervals in minutes")
+                label: I18n.trFor("clockwork", "Work Duration")
+                description: I18n.trFor("clockwork", "Duration of focus work intervals in minutes")
                 defaultValue: 25
                 minimum: Engine.LIMITS.POMODORO_WORK_MIN
                 maximum: Engine.LIMITS.POMODORO_WORK_MAX
@@ -79,8 +79,8 @@ PluginSettings {
 
             SliderSetting {
                 settingKey: "pomodoroShortBreakMinutes"
-                label: I18n.tr("Short Break Duration")
-                description: I18n.tr("Duration of short breaks in minutes")
+                label: I18n.trFor("clockwork", "Short Break Duration")
+                description: I18n.trFor("clockwork", "Duration of short breaks in minutes")
                 defaultValue: 5
                 minimum: Engine.LIMITS.POMODORO_SHORT_BREAK_MIN
                 maximum: Engine.LIMITS.POMODORO_SHORT_BREAK_MAX
@@ -89,8 +89,8 @@ PluginSettings {
 
             SliderSetting {
                 settingKey: "pomodoroLongBreakMinutes"
-                label: I18n.tr("Long Break Duration")
-                description: I18n.tr("Duration of long breaks after completing cycle set in minutes")
+                label: I18n.trFor("clockwork", "Long Break Duration")
+                description: I18n.trFor("clockwork", "Duration of long breaks after completing cycle set in minutes")
                 defaultValue: 15
                 minimum: Engine.LIMITS.POMODORO_LONG_BREAK_MIN
                 maximum: Engine.LIMITS.POMODORO_LONG_BREAK_MAX
@@ -99,8 +99,8 @@ PluginSettings {
 
             SliderSetting {
                 settingKey: "pomodoroCycles"
-                label: I18n.tr("Cycles Until Long Break")
-                description: I18n.tr("Number of focus sessions before a long break")
+                label: I18n.trFor("clockwork", "Cycles Until Long Break")
+                description: I18n.trFor("clockwork", "Number of focus sessions before a long break")
                 defaultValue: 4
                 minimum: Engine.LIMITS.POMODORO_CYCLES_MIN
                 maximum: Engine.LIMITS.POMODORO_CYCLES_MAX
@@ -108,8 +108,8 @@ PluginSettings {
 
             ToggleSetting {
                 settingKey: "pomodoroSound"
-                label: I18n.tr("Pomodoro Sound Alerts")
-                description: I18n.tr("Play completion sound chime at the end of each phase")
+                label: I18n.trFor("clockwork", "Pomodoro Sound Alerts")
+                description: I18n.trFor("clockwork", "Play completion sound chime at the end of each phase")
                 defaultValue: true
             }
         }
@@ -121,7 +121,7 @@ PluginSettings {
     StyledRect {
         id: alarmCard
         width: parent.width
-        height: alarmCol.implicitHeight + Theme.spacingL * 2
+        implicitHeight: alarmCol.implicitHeight + Theme.spacingL * 2
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh
 
@@ -142,7 +142,7 @@ PluginSettings {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 StyledText {
-                    text: I18n.tr("Alarm Preferences")
+                    text: I18n.trFor("clockwork", "Alarm Preferences")
                     font.pixelSize: Theme.fontSizeLarge
                     font.weight: Font.Medium
                     color: Theme.surfaceText
@@ -152,26 +152,26 @@ PluginSettings {
 
             ToggleSetting {
                 settingKey: "alarmUses12Hour"
-                label: I18n.tr("12-Hour Clock Format")
-                description: I18n.tr("Display and edit alarm times using 12-hour AM/PM format")
+                label: I18n.trFor("clockwork", "12-Hour Clock Format")
+                description: I18n.trFor("clockwork", "Display and edit alarm times using 12-hour AM/PM format")
                 defaultValue: false
             }
 
             SelectionSetting {
                 settingKey: "alarmSound"
-                label: I18n.tr("Alarm Sound")
-                description: I18n.tr("Audio ringtone played when alarm triggers")
+                label: I18n.trFor("clockwork", "Alarm Sound")
+                description: I18n.trFor("clockwork", "Audio ringtone played when alarm triggers")
                 options: [
                     {
-                        label: "Alarm clock (alarm-clock-elapsed.oga)",
+                        label: I18n.trFor("clockwork", "Alarm clock (alarm-clock-elapsed.oga)"),
                         value: "alarm-clock-elapsed.oga"
                     },
                     {
-                        label: "Bell (bell.oga)",
+                        label: I18n.trFor("clockwork", "Bell (bell.oga)"),
                         value: "bell.oga"
                     },
                     {
-                        label: "Phone (phone-incoming-call.oga)",
+                        label: I18n.trFor("clockwork", "Phone (phone-incoming-call.oga)"),
                         value: "phone-incoming-call.oga"
                     }
                 ]
@@ -186,7 +186,7 @@ PluginSettings {
     StyledRect {
         id: countdownCard
         width: parent.width
-        height: countdownCol.implicitHeight + Theme.spacingL * 2
+        implicitHeight: countdownCol.implicitHeight + Theme.spacingL * 2
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh
 
@@ -207,42 +207,43 @@ PluginSettings {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 StyledText {
-                    text: I18n.tr("Countdown & Breaks")
-                    font.pixelSize: Theme.fontSizeMedium
-                    font.weight: Font.Bold
+                    text: I18n.trFor("clockwork", "Countdown & Breaks")
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.Medium
                     color: Theme.surfaceText
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
 
-            SpinBoxSetting {
+            SliderSetting {
                 settingKey: "countdownMinutes"
-                label: I18n.tr("Default Countdown Duration (minutes)")
-                description: I18n.tr("Default duration when resetting or opening countdown")
-                minimumValue: 1
-                maximumValue: 180
-                stepSize: 1
+                label: I18n.trFor("clockwork", "Default Countdown Duration")
+                description: I18n.trFor("clockwork", "Default minutes when resetting or starting countdown")
+                minimum: 1
+                maximum: 180
+                unit: " min"
                 defaultValue: 5
             }
 
-            TextFieldSetting {
+            StringSetting {
                 settingKey: "countdownMessage"
-                label: I18n.tr("Default Break / Alert Message")
-                description: I18n.tr("Message shown in full-screen overlay and desktop notifications")
+                label: I18n.trFor("clockwork", "Default Break / Alert Message")
+                description: I18n.trFor("clockwork", "Message shown in full-screen overlay and desktop notifications")
+                placeholder: "Take a break"
                 defaultValue: "Take a break"
             }
 
             ToggleSetting {
                 settingKey: "countdownFullscreenEnabled"
-                label: I18n.tr("Full-Screen Overlay on Expiry")
-                description: I18n.tr("Display a full-screen break reminder when a countdown completes")
+                label: I18n.trFor("clockwork", "Full-Screen Overlay on Expiry")
+                description: I18n.trFor("clockwork", "Display a full-screen break reminder when a countdown completes")
                 defaultValue: false
             }
 
             ToggleSetting {
                 settingKey: "showBarText"
-                label: I18n.tr("Show Remaining Time in Bar")
-                description: I18n.tr("Show countdown and timer text in the bar widget pill")
+                label: I18n.trFor("clockwork", "Show Remaining Time in Bar")
+                description: I18n.trFor("clockwork", "Show countdown and timer text in the bar widget pill")
                 defaultValue: true
             }
         }
@@ -266,5 +267,6 @@ PluginSettings {
         ClockworkCore.ClockworkState.setCountdownFullscreenEnabled(loadValue("countdownFullscreenEnabled", false), false);
         ClockworkCore.ClockworkState.setCountdownMessage(loadValue("countdownMessage", "Take a break"), false);
         ClockworkCore.ClockworkState.setCountdownMinutes(loadValue("countdownMinutes", 5), false);
+        ClockworkCore.ClockworkState.setCountdownSeconds(loadValue("countdownSeconds", 0), false);
     }
 }

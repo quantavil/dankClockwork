@@ -8,11 +8,10 @@ import "." as ClockworkCore
 PluginComponent {
     id: root
 
-    // Popout configuration
-    popoutWidth: 460
-    popoutHeight: 0
-
-    readonly property var timerState: ClockworkCore.ClockworkState
+    // =========================================================================
+    // Properties & State
+    // =========================================================================
+    readonly property ClockworkCore.ClockworkState timerState: ClockworkCore.ClockworkState
 
     // Settings loaded from DMS PluginService
     property bool showBarText: pluginData.showBarText ?? true
@@ -26,6 +25,7 @@ PluginComponent {
     property bool defaultFullscreenBreak: pluginData.countdownFullscreenEnabled ?? false
     property string defaultCountdownMessage: pluginData.countdownMessage || "Take a break"
     property int defaultCountdownMinutes: pluginData.countdownMinutes ? parseInt(pluginData.countdownMinutes, 10) : 5
+    property int defaultCountdownSeconds: pluginData.countdownSeconds ? parseInt(pluginData.countdownSeconds, 10) : 0
 
     // Alarm pulsing state
     readonly property bool isAlarmRinging: timerState.isAlarmRinging
@@ -35,6 +35,29 @@ PluginComponent {
 
     // Urgent flashing cue for ringing alarm
     property bool pulseUrgent: false
+
+    readonly property string barDisplayText: {
+        if (timerState.mode === timerState.alarmMode && timerState.running)
+            return timerState.alarmTimeText;
+        if (timerState.barTimeText !== "")
+            return timerState.barTimeText;
+        return "";
+    }
+
+    // =========================================================================
+    // Popout Configuration
+    // =========================================================================
+    popoutWidth: 460
+    popoutHeight: 0 // Dynamic height calculated via ClockworkPopout implicitHeight
+
+    // Right-click support adhering to Fitts's Law screen-edge expansion (Trap 12)
+    pillRightClickAction: (x, y, width, section, screen) => {
+        root.handleRightClick();
+    }
+
+    // =========================================================================
+    // Timers & Life-Cycle
+    // =========================================================================
     Timer {
         id: alarmPulseTimer
         interval: 500
@@ -44,7 +67,6 @@ PluginComponent {
         onRunningChanged: if (!running) root.pulseUrgent = false
     }
 
-    // Apply plugin settings on startup
     Component.onCompleted: {
         root.applyConfiguredSettings();
     }
@@ -53,48 +75,12 @@ PluginComponent {
         root.applyConfiguredSettings();
     }
 
-    function applyConfiguredSettings() {
-        if (!timerState) return;
-        timerState.configurePomodoro(
-            root.defaultWorkMinutes,
-            root.defaultShortBreakMinutes,
-            root.defaultCycles,
-            root.defaultLongBreakMinutes,
-            root.defaultPomodoroSound,
-            "#a6e3a1"
-        );
-        timerState.setAlarmUses12Hour(root.defaultAlarm12Hour, false);
-        timerState.setAlarmSound(root.defaultAlarmSound, false);
-        timerState.setCountdownFullscreenEnabled(root.defaultFullscreenBreak, false);
-        timerState.setCountdownMessage(root.defaultCountdownMessage, false);
-        timerState.setCountdownMinutes(root.defaultCountdownMinutes, false);
-    }
-
-    // Host persistence bridge
-    function saveSetting(key, value) {
-        if (pluginService && pluginId) {
-            pluginService.savePluginData(pluginId, key, value);
-        }
-    }
-
-    function isPopoutOpen(): bool {
-        for (let i = 0; i < root.children.length; i++) {
-            let ch = root.children[i];
-            if (ch && ch.hasOwnProperty("shouldBeVisible")) {
-                return ch.shouldBeVisible;
-            }
-        }
-        return false;
-    }
-
-    function openPopout() {
-        if (!isPopoutOpen()) {
-            root.triggerPopout();
-        }
-    }
-
+    // Host persistence & IPC synchronization
     Connections {
         target: root.timerState
+        // On multi-monitor setups, gate save delegation to the primary widget instance
+        enabled: root.isFirst ?? true
+
         function onSettingSaveRequested(key, value) {
             root.saveSetting(key, value);
         }
@@ -109,6 +95,57 @@ PluginComponent {
         }
     }
 
+    // =========================================================================
+    // Helper Methods
+    // =========================================================================
+    function applyConfiguredSettings() {
+        if (!timerState) return;
+        timerState.configurePomodoro(
+            root.defaultWorkMinutes,
+            root.defaultShortBreakMinutes,
+            root.defaultCycles,
+            root.defaultLongBreakMinutes,
+            root.defaultPomodoroSound,
+            Theme.secondary
+        );
+        timerState.setAlarmUses12Hour(root.defaultAlarm12Hour, false);
+        timerState.setAlarmSound(root.defaultAlarmSound, false);
+        timerState.setCountdownFullscreenEnabled(root.defaultFullscreenBreak, false);
+        timerState.setCountdownMessage(root.defaultCountdownMessage, false);
+        timerState.setCountdownMinutes(root.defaultCountdownMinutes, false);
+        timerState.setCountdownSeconds(root.defaultCountdownSeconds, false);
+    }
+
+    function saveSetting(key, value) {
+        if (pluginService && pluginId) {
+            pluginService.savePluginData(pluginId, key, value);
+        }
+    }
+
+    function isPopoutOpen(): bool {
+        return root.timerState.popoutOpen;
+    }
+
+    function openPopout() {
+        if (!root.isPopoutOpen()) {
+            root.triggerPopout();
+        }
+    }
+
+    function handleMiddleClick() {
+        root.timerState.startPause();
+    }
+
+    function handleRightClick() {
+        if (root.timerState.isAlarmRinging) {
+            root.timerState.reset();
+        } else if (root.timerState.running) {
+            root.timerState.pause();
+        } else {
+            root.timerState.reset();
+        }
+    }
+
     function getModeIcon() {
         if (timerState.mode === timerState.stopwatchMode) return "timer";
         if (timerState.mode === timerState.countdownMode) return "hourglass_bottom";
@@ -120,20 +157,12 @@ PluginComponent {
         return "schedule";
     }
 
-    readonly property string barDisplayText: {
-        if (timerState.mode === timerState.alarmMode && timerState.running)
-            return timerState.alarmTimeText;
-        if (timerState.barTimeText !== "")
-            return timerState.barTimeText;
-        return "";
-    }
-
     function getPillColor() {
         if (root.isAlarmRinging) {
             return root.pulseUrgent ? Theme.error : Theme.surfaceText;
         }
         if (root.isPomodoroBreak) {
-            return timerState.pomodoroBreakColor;
+            return Theme.secondary;
         }
         if (timerState.running) {
             return Theme.primary;
@@ -174,19 +203,11 @@ PluginComponent {
 
             MouseArea {
                 anchors.fill: parent
-                acceptedButtons: Qt.MiddleButton | Qt.RightButton
+                acceptedButtons: Qt.MiddleButton
                 cursorShape: Qt.PointingHandCursor
                 onClicked: mouse => {
                     if (mouse.button === Qt.MiddleButton) {
-                        root.timerState.startPause();
-                    } else if (mouse.button === Qt.RightButton) {
-                        if (root.timerState.isAlarmRinging) {
-                            root.timerState.reset();
-                        } else if (root.timerState.running) {
-                            root.timerState.pause();
-                        } else {
-                            root.timerState.reset();
-                        }
+                        root.handleMiddleClick();
                     }
                 }
             }
@@ -209,14 +230,14 @@ PluginComponent {
 
                 DankIcon {
                     name: root.getModeIcon()
-                    size: Theme.iconSize - 6
+                    size: root.iconSize
                     color: root.getPillColor()
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
                 StyledText {
                     text: root.barDisplayText
-                    font.pixelSize: 10
+                    font.pixelSize: Math.max(10, Theme.fontSizeSmall - 2)
                     font.weight: root.timerState.running ? Font.Bold : Font.Normal
                     color: root.isAlarmRinging ? Theme.error : (root.timerState.running ? Theme.primary : Theme.surfaceText)
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -226,19 +247,11 @@ PluginComponent {
 
             MouseArea {
                 anchors.fill: parent
-                acceptedButtons: Qt.MiddleButton | Qt.RightButton
+                acceptedButtons: Qt.MiddleButton
                 cursorShape: Qt.PointingHandCursor
                 onClicked: mouse => {
                     if (mouse.button === Qt.MiddleButton) {
-                        root.timerState.startPause();
-                    } else if (mouse.button === Qt.RightButton) {
-                        if (root.timerState.isAlarmRinging) {
-                            root.timerState.reset();
-                        } else if (root.timerState.running) {
-                            root.timerState.pause();
-                        } else {
-                            root.timerState.reset();
-                        }
+                        root.handleMiddleClick();
                     }
                 }
             }
@@ -254,11 +267,12 @@ PluginComponent {
         }
     }
 
-    // Fullscreen Countdown Break window instance
+    // Fullscreen Countdown Break window instance (only active on primary instance to prevent multi-monitor focus fight)
     ClockworkFullscreenBreak {
         id: fullscreenBreakWindow
         targetScreen: root.parentScreen || null
-        active: root.timerState.countdownFullscreenEnabled
+        active: (root.isFirst ?? true)
+            && root.timerState.countdownFullscreenEnabled
             && root.timerState.mode === root.timerState.countdownMode
             && root.timerState.completed
             && !root.timerState.breakDismissed

@@ -8,7 +8,7 @@ import "ClockworkEngine.js" as Engine
 PopoutComponent {
     id: root
 
-    headerText: "Clockwork"
+    headerText: I18n.trFor("clockwork", "Clockwork")
     detailsText: ClockworkCore.ClockworkState.statusText
     showCloseButton: true
 
@@ -22,65 +22,30 @@ PopoutComponent {
     focus: true
     Keys.enabled: true
 
-    function hookParentKeys() {
+    Component.onCompleted: {
         if (root.parentPopout) {
             root.parentPopout.contentHandlesKeys = true;
         }
-        var p = root.parent;
-        while (p) {
-            if (p.Keys) {
-                var fw = p.Keys.forwardTo || [];
-                var contains = false;
-                for (var i = 0; i < fw.length; i++) {
-                    if (fw[i] === root) {
-                        contains = true;
-                        break;
-                    }
-                }
-                if (!contains) {
-                    p.Keys.forwardTo = [root].concat(fw);
-                }
-            }
-            p = p.parent;
-        }
-    }
-
-    Component.onCompleted: {
-        hookParentKeys();
-        Qt.callLater(() => {
-            hookParentKeys();
-            root.forceActiveFocus();
-        });
+        Qt.callLater(() => root.forceActiveFocus());
     }
 
     Component.onDestruction: {
         ClockworkCore.ClockworkState.popoutOpen = false;
-        var p = root.parent;
-        while (p) {
-            if (p.Keys && p.Keys.forwardTo) {
-                var fw = p.Keys.forwardTo;
-                p.Keys.forwardTo = fw.filter(item => item !== root);
-            }
-            p = p.parent;
-        }
-    }
-
-    onParentChanged: {
-        hookParentKeys();
     }
 
     onParentPopoutChanged: {
-        hookParentKeys();
+        if (root.parentPopout) {
+            root.parentPopout.contentHandlesKeys = true;
+        }
     }
 
     onVisibleChanged: {
         ClockworkCore.ClockworkState.popoutOpen = visible;
         if (visible) {
-            hookParentKeys();
-            Qt.callLater(() => {
-                hookParentKeys();
-                root.forceActiveFocus();
-            });
+            if (root.parentPopout) {
+                root.parentPopout.contentHandlesKeys = true;
+            }
+            Qt.callLater(() => root.forceActiveFocus());
         }
     }
 
@@ -88,20 +53,20 @@ PopoutComponent {
         if (!event) return;
 
         // Do not intercept standard typing if a text input currently has active focus
-        var focusedItem = Window.activeFocusItem;
+        const focusedItem = Window.activeFocusItem;
         if (focusedItem && focusedItem !== root &&
             (focusedItem.hasOwnProperty("inputMethodHints") || focusedItem.hasOwnProperty("cursorPosition"))) {
             return;
         }
 
-        // Mode switching via numbers 1-5 (top row, keypad, or character)
+        // Mode switching via numbers 1-5
         if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5) {
             timerState.selectMode(event.key - Qt.Key_1);
             event.accepted = true;
             return;
         }
         if (event.text >= "1" && event.text <= "5") {
-            var modeIndex = parseInt(event.text, 10) - 1;
+            const modeIndex = parseInt(event.text, 10) - 1;
             if (modeIndex >= 0 && modeIndex <= 4) {
                 timerState.selectMode(modeIndex);
                 event.accepted = true;
@@ -165,19 +130,22 @@ PopoutComponent {
 
             Repeater {
                 model: [
-                    { name: "Stopwatch", icon: "timer", mode: 0 },
-                    { name: "Countdown", icon: "hourglass_bottom", mode: 1 },
-                    { name: "Intervals", icon: "fitness_center", mode: 2 },
-                    { name: "Alarm", icon: "alarm", mode: 3 },
-                    { name: "Pomodoro", icon: "emoji_food_beverage", mode: 4 }
+                    { name: I18n.trFor("clockwork", "Stopwatch"), icon: "timer", mode: 0 },
+                    { name: I18n.trFor("clockwork", "Countdown"), icon: "hourglass_bottom", mode: 1 },
+                    { name: I18n.trFor("clockwork", "Intervals"), icon: "fitness_center", mode: 2 },
+                    { name: I18n.trFor("clockwork", "Alarm"), icon: "alarm", mode: 3 },
+                    { name: I18n.trFor("clockwork", "Pomodoro"), icon: "emoji_food_beverage", mode: 4 }
                 ]
 
                 delegate: StyledRect {
                     id: tabChip
+                    required property var modelData
+                    required property int index
+
                     readonly property bool isSelected: root.currentMode === modelData.mode
                     readonly property bool isHovered: tabMouseArea.containsMouse
 
-                    width: (modeTabsRow.width - (Theme.spacingXS * 4)) / 5
+                    width: Math.max(0, (modeTabsRow.width - (Theme.spacingXS * 4)) / 5)
                     height: 36
                     radius: Theme.cornerRadiusSmall
                     color: isSelected ? Theme.primary : (isHovered ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
@@ -191,18 +159,17 @@ PopoutComponent {
                         spacing: 4
 
                         DankIcon {
-                            name: modelData.icon
+                            name: tabChip.modelData.icon
                             size: 16
                             color: tabChip.isSelected ? Theme.primaryText : Theme.surfaceText
-                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         StyledText {
-                            text: modelData.name
+                            text: tabChip.modelData.name
                             font.pixelSize: 11
                             font.weight: tabChip.isSelected ? Font.Bold : Font.Normal
                             color: tabChip.isSelected ? Theme.primaryText : Theme.surfaceText
-                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.max(0, tabChip.width - 26)
                             elide: Text.ElideRight
                         }
                     }
@@ -213,7 +180,7 @@ PopoutComponent {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            root.timerState.selectMode(modelData.mode);
+                            root.timerState.selectMode(tabChip.modelData.mode);
                         }
                     }
                 }
@@ -261,7 +228,6 @@ PopoutComponent {
                             font.pixelSize: 36
                             font.weight: Font.Bold
                             color: Theme.surfaceText
-                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         ClockworkTimeField {
@@ -296,7 +262,6 @@ PopoutComponent {
                             font.pixelSize: 36
                             font.weight: Font.Bold
                             color: Theme.surfaceText
-                            anchors.verticalCenter: parent.verticalCenter
                         }
 
                         ClockworkTimeField {
@@ -313,7 +278,6 @@ PopoutComponent {
                             height: 38
                             radius: Theme.cornerRadiusSmall
                             color: amPmArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerLow
-                            anchors.verticalCenter: parent.verticalCenter
 
                             StyledText {
                                 anchors.centerIn: parent
@@ -338,14 +302,14 @@ PopoutComponent {
                     // CASE C: Active / Running / Stopwatch / Intervals / Pomodoro Display
                     StyledText {
                         anchors.centerIn: parent
-                        visible: !( (root.currentMode === root.timerState.countdownMode || root.currentMode === root.timerState.alarmMode) && root.isEditable )
+                        visible: !((root.currentMode === root.timerState.countdownMode || root.currentMode === root.timerState.alarmMode) && root.isEditable)
                         text: root.timerState.displayText
                         font.pixelSize: 44
                         font.weight: Font.Bold
                         color: {
                             if (root.currentMode === root.timerState.pomodoroMode && root.timerState.pomodoroPhaseKind !== "focus")
-                                return root.timerState.pomodoroBreakColor;
-                            if (root.currentMode === root.timerState.alarmMode && root.isCompleted)
+                                return Theme.secondary;
+                            if (root.currentMode === root.timerState.alarmMode && (root.timerState.isAlarmRinging || root.isCompleted))
                                 return Theme.error;
                             if (root.isRunning)
                                 return Theme.primary;
@@ -359,18 +323,23 @@ PopoutComponent {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: {
                         if (root.currentMode === root.timerState.intervalsMode) {
-                            return "Round " + root.timerState.currentRound + " of " + root.timerState.intervalRounds + " • " + root.timerState.intervalDurationText;
+                            return I18n.trFor("clockwork", "Round %1 of %2 • %3")
+                                .arg(root.timerState.currentRound)
+                                .arg(root.timerState.intervalRounds)
+                                .arg(root.timerState.intervalDurationText);
                         }
                         if (root.currentMode === root.timerState.pomodoroMode) {
                             return root.timerState.pomodoroPhase.label;
                         }
                         if (root.currentMode === root.timerState.alarmMode) {
-                            return root.isRunning ? ("Armed for " + root.timerState.alarmTimeText) : "One-shot Alarm";
+                            return root.isRunning
+                                ? (I18n.trFor("clockwork", "Armed for %1").arg(root.timerState.alarmTimeText))
+                                : I18n.trFor("clockwork", "One-shot Alarm");
                         }
                         if (root.currentMode === root.timerState.countdownMode) {
                             return root.timerState.countdownMessage;
                         }
-                        return "Count-up timer";
+                        return I18n.trFor("clockwork", "Count-up timer");
                     }
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
@@ -395,7 +364,7 @@ PopoutComponent {
                         radius: 2
                         color: {
                             if (root.currentMode === root.timerState.pomodoroMode && root.timerState.pomodoroPhaseKind !== "focus")
-                                return root.timerState.pomodoroBreakColor;
+                                return Theme.secondary;
                             return Theme.primary;
                         }
                     }
@@ -414,8 +383,8 @@ PopoutComponent {
             visible: root.currentMode === root.timerState.intervalsMode && !root.timerState.running && !root.timerState.completed
 
             ClockworkCompactField {
-                width: (parent.width - (Theme.spacingS * 2)) / 3
-                label: "Rounds"
+                width: Math.max(0, (parent.width - (Theme.spacingS * 2)) / 3)
+                label: I18n.trFor("clockwork", "Rounds")
                 value: root.timerState.intervalRounds
                 from: Engine.LIMITS.INTERVAL_ROUNDS_MIN
                 to: Engine.LIMITS.INTERVAL_ROUNDS_MAX
@@ -423,8 +392,8 @@ PopoutComponent {
             }
 
             ClockworkCompactField {
-                width: (parent.width - (Theme.spacingS * 2)) / 3
-                label: "Minutes"
+                width: Math.max(0, (parent.width - (Theme.spacingS * 2)) / 3)
+                label: I18n.trFor("clockwork", "Minutes")
                 value: root.timerState.intervalMinutes
                 from: Engine.LIMITS.INTERVAL_MINUTES_MIN
                 to: Engine.LIMITS.INTERVAL_MINUTES_MAX
@@ -432,8 +401,8 @@ PopoutComponent {
             }
 
             ClockworkCompactField {
-                width: (parent.width - (Theme.spacingS * 2)) / 3
-                label: "Seconds"
+                width: Math.max(0, (parent.width - (Theme.spacingS * 2)) / 3)
+                label: I18n.trFor("clockwork", "Seconds")
                 value: root.timerState.intervalSeconds
                 from: Engine.LIMITS.INTERVAL_SECONDS_MIN
                 to: Engine.LIMITS.INTERVAL_SECONDS_MAX
@@ -449,8 +418,8 @@ PopoutComponent {
             visible: root.currentMode === root.timerState.pomodoroMode && !root.timerState.pomodoroSessionStarted
 
             ClockworkCompactField {
-                width: (parent.width - Theme.spacingS) / 2
-                label: "Work Duration (min)"
+                width: Math.max(0, (parent.width - Theme.spacingS) / 2)
+                label: I18n.trFor("clockwork", "Work Duration (min)")
                 value: root.timerState.pomodoroWorkMinutes
                 from: Engine.LIMITS.POMODORO_WORK_MIN
                 to: Engine.LIMITS.POMODORO_WORK_MAX
@@ -458,8 +427,8 @@ PopoutComponent {
             }
 
             ClockworkCompactField {
-                width: (parent.width - Theme.spacingS) / 2
-                label: "Short Break (min)"
+                width: Math.max(0, (parent.width - Theme.spacingS) / 2)
+                label: I18n.trFor("clockwork", "Short Break (min)")
                 value: root.timerState.pomodoroShortBreakMinutes
                 from: Engine.LIMITS.POMODORO_SHORT_BREAK_MIN
                 to: Engine.LIMITS.POMODORO_SHORT_BREAK_MAX
@@ -467,8 +436,8 @@ PopoutComponent {
             }
 
             ClockworkCompactField {
-                width: (parent.width - Theme.spacingS) / 2
-                label: "Long Break (min)"
+                width: Math.max(0, (parent.width - Theme.spacingS) / 2)
+                label: I18n.trFor("clockwork", "Long Break (min)")
                 value: root.timerState.pomodoroLongBreakMinutes
                 from: Engine.LIMITS.POMODORO_LONG_BREAK_MIN
                 to: Engine.LIMITS.POMODORO_LONG_BREAK_MAX
@@ -476,8 +445,8 @@ PopoutComponent {
             }
 
             ClockworkCompactField {
-                width: (parent.width - Theme.spacingS) / 2
-                label: "Cycles per Round"
+                width: Math.max(0, (parent.width - Theme.spacingS) / 2)
+                label: I18n.trFor("clockwork", "Cycles per Round")
                 value: root.timerState.pomodoroCycles
                 from: Engine.LIMITS.POMODORO_CYCLES_MIN
                 to: Engine.LIMITS.POMODORO_CYCLES_MAX
@@ -493,10 +462,14 @@ PopoutComponent {
 
             // Fullscreen Break Toggle Chip
             StyledRect {
-                width: (parent.width - Theme.spacingM) * 0.45
+                id: fullscreenChip
+                readonly property bool isHovered: fullscreenArea.containsMouse
+                width: Math.max(0, (parent.width - Theme.spacingM) * 0.45)
                 height: 38
                 radius: Theme.cornerRadiusSmall
-                color: root.timerState.countdownFullscreenEnabled ? Theme.primaryContainer : Theme.surfaceContainerHigh
+                color: root.timerState.countdownFullscreenEnabled
+                    ? Theme.primaryContainer
+                    : (isHovered ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
 
                 Row {
                     anchors.centerIn: parent
@@ -506,19 +479,19 @@ PopoutComponent {
                         name: "fullscreen"
                         size: 18
                         color: root.timerState.countdownFullscreenEnabled ? Theme.primary : Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
-                        text: "Fullscreen Break"
+                        text: I18n.trFor("clockwork", "Fullscreen Break")
                         font.pixelSize: Theme.fontSizeSmall
                         color: root.timerState.countdownFullscreenEnabled ? Theme.primary : Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
                 MouseArea {
+                    id: fullscreenArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.timerState.setCountdownFullscreenEnabled(!root.timerState.countdownFullscreenEnabled)
                 }
@@ -526,7 +499,7 @@ PopoutComponent {
 
             // Message Editor
             StyledRect {
-                width: (parent.width - Theme.spacingM) * 0.55
+                width: Math.max(0, (parent.width - Theme.spacingM) * 0.55)
                 height: 38
                 radius: Theme.cornerRadiusSmall
                 color: Theme.surfaceContainerHigh
@@ -542,7 +515,10 @@ PopoutComponent {
                     text: root.timerState.countdownMessage
                     maximumLength: 60
                     selectByMouse: true
-                    onEditingFinished: root.timerState.setCountdownMessage(text)
+                    onEditingFinished: {
+                        root.timerState.setCountdownMessage(text);
+                        countdownMessageInput.text = Qt.binding(() => root.timerState.countdownMessage);
+                    }
                 }
             }
         }
@@ -555,10 +531,14 @@ PopoutComponent {
 
             // 12-Hour Mode Toggle
             StyledRect {
-                width: (parent.width - Theme.spacingM) * 0.4
+                id: twelveHourChip
+                readonly property bool isHovered: twelveHourArea.containsMouse
+                width: Math.max(0, (parent.width - Theme.spacingM) * 0.4)
                 height: 38
                 radius: Theme.cornerRadiusSmall
-                color: root.timerState.alarmUses12Hour ? Theme.primaryContainer : Theme.surfaceContainerHigh
+                color: root.timerState.alarmUses12Hour
+                    ? Theme.primaryContainer
+                    : (isHovered ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
 
                 Row {
                     anchors.centerIn: parent
@@ -568,27 +548,27 @@ PopoutComponent {
                         name: "schedule"
                         size: 18
                         color: root.timerState.alarmUses12Hour ? Theme.primary : Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
-                        text: "12-Hour Format"
+                        text: I18n.trFor("clockwork", "12-Hour Format")
                         font.pixelSize: Theme.fontSizeSmall
                         color: root.timerState.alarmUses12Hour ? Theme.primary : Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
                 MouseArea {
+                    id: twelveHourArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.timerState.setAlarmUses12Hour(!root.timerState.alarmUses12Hour)
                 }
             }
 
-            // Sound Cycler Button
+            // Sound Cycler Button with Audio Preview
             StyledRect {
-                width: (parent.width - Theme.spacingM) * 0.6
+                width: Math.max(0, (parent.width - Theme.spacingM) * 0.6)
                 height: 38
                 radius: Theme.cornerRadiusSmall
                 color: soundArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
@@ -601,14 +581,12 @@ PopoutComponent {
                         name: "volume_up"
                         size: 18
                         color: Theme.primary
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
-                        text: "Sound: " + root.timerState.alarmSoundName
+                        text: I18n.trFor("clockwork", "Sound: %1").arg(root.timerState.alarmSoundName)
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
@@ -616,50 +594,62 @@ PopoutComponent {
                     id: soundArea
                     anchors.fill: parent
                     hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.timerState.cycleAlarmSound(1)
+                    onClicked: mouse => {
+                        const dir = mouse.button === Qt.RightButton ? -1 : 1;
+                        root.timerState.cycleAlarmSound(dir);
+                        root.timerState.playSound(root.timerState.alarmSound);
+                    }
                 }
             }
         }
 
         // =====================================================================
-        // 4. Quick Action Buttons (Start, Pause, Reset, Skip)
+        // 4. Quick Action Buttons (Start, Pause, Reset, Skip, Stop Alarm)
         // =====================================================================
         Row {
             width: parent.width
             spacing: Theme.spacingM
 
-            // Main Primary Action: Start / Pause / Set Alarm
+            // Main Primary Action: Start / Pause / Stop Alarm / Set Alarm
             StyledRect {
                 id: mainActionButton
+                readonly property bool isRinging: root.timerState.isAlarmRinging
                 width: (root.currentMode === root.timerState.pomodoroMode && root.timerState.pomodoroSessionStarted)
-                    ? (parent.width - (Theme.spacingM * 2)) / 3
-                    : (parent.width - Theme.spacingM) / 2
+                    ? Math.max(0, (parent.width - (Theme.spacingM * 2)) / 3)
+                    : Math.max(0, (parent.width - Theme.spacingM) / 2)
                 height: 42
                 radius: Theme.cornerRadius
-                color: playMouseArea.containsMouse ? Qt.darker(Theme.primary, 1.1) : Theme.primary
+                color: isRinging
+                    ? Theme.error
+                    : (playMouseArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.88) : Theme.primary)
 
                 Row {
                     anchors.centerIn: parent
                     spacing: 8
 
                     DankIcon {
-                        name: root.isRunning ? "pause" : "play_arrow"
+                        name: {
+                            if (mainActionButton.isRinging) return "alarm_off";
+                            if (root.isRunning) return "pause";
+                            if (root.currentMode === root.timerState.alarmMode) return "alarm";
+                            return "play_arrow";
+                        }
                         size: 20
                         color: Theme.primaryText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
                         text: {
-                            if (root.isRunning) return "Pause";
-                            if (root.currentMode === root.timerState.alarmMode) return "Set Alarm";
-                            return "Start";
+                            if (mainActionButton.isRinging) return I18n.trFor("clockwork", "Stop Alarm");
+                            if (root.isRunning) return I18n.trFor("clockwork", "Pause");
+                            if (root.currentMode === root.timerState.alarmMode) return I18n.trFor("clockwork", "Set Alarm");
+                            return I18n.trFor("clockwork", "Start");
                         }
                         font.pixelSize: Theme.fontSizeMedium
                         font.weight: Font.Bold
                         color: Theme.primaryText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
@@ -668,14 +658,20 @@ PopoutComponent {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.timerState.startPause()
+                    onClicked: {
+                        if (mainActionButton.isRinging) {
+                            root.timerState.reset();
+                        } else {
+                            root.timerState.startPause();
+                        }
+                    }
                 }
             }
 
             // Skip Button (Pomodoro only)
             StyledRect {
                 visible: root.currentMode === root.timerState.pomodoroMode && root.timerState.pomodoroSessionStarted
-                width: (parent.width - (Theme.spacingM * 2)) / 3
+                width: Math.max(0, (parent.width - (Theme.spacingM * 2)) / 3)
                 height: 42
                 radius: Theme.cornerRadius
                 color: skipMouseArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
@@ -688,14 +684,12 @@ PopoutComponent {
                         name: "skip_next"
                         size: 20
                         color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
-                        text: "Skip"
+                        text: I18n.trFor("clockwork", "Skip")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
@@ -712,8 +706,8 @@ PopoutComponent {
             StyledRect {
                 id: resetActionButton
                 width: (root.currentMode === root.timerState.pomodoroMode && root.timerState.pomodoroSessionStarted)
-                    ? (parent.width - (Theme.spacingM * 2)) / 3
-                    : (parent.width - Theme.spacingM) / 2
+                    ? Math.max(0, (parent.width - (Theme.spacingM * 2)) / 3)
+                    : Math.max(0, (parent.width - Theme.spacingM) / 2)
                 height: 42
                 radius: Theme.cornerRadius
                 color: resetMouseArea.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
@@ -726,14 +720,12 @@ PopoutComponent {
                         name: "restart_alt"
                         size: 20
                         color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
 
                     StyledText {
-                        text: "Reset"
+                        text: I18n.trFor("clockwork", "Reset")
                         font.pixelSize: Theme.fontSizeMedium
                         color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
 
