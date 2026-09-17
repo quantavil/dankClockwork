@@ -1,0 +1,24 @@
+{
+  "id": "clockwork",
+  "name": "Clockwork",
+  "description": "A stopwatch, countdown, alarm, intervals, and Pomodoro timer for DankMaterialShell",
+  "version": "1.0.0",
+  "author": "quantavil",
+  "type": "widget",
+  "capabilities": [
+    "dankbar-widget"
+  ],
+  "component": "./ClockworkWidget.qml",
+  "icon": "schedule",
+  "settings": "./ClockworkSettings.qml",
+  "requires_dms": ">=1.4.0",
+  "dependencies": [
+    "pw-play",
+    "notify-send"
+  ],
+  "permissions": [
+    "settings_read",
+    "settings_write",
+    "process"
+  ]
+}

@@ -1,0 +1,8 @@
+module Clockwork
+singleton ClockworkState 1.0 ClockworkState.qml
+ClockworkWidget 1.0 ClockworkWidget.qml
+ClockworkPopout 1.0 ClockworkPopout.qml
+ClockworkSettings 1.0 ClockworkSettings.qml
+ClockworkTimeField 1.0 ClockworkTimeField.qml
+ClockworkCompactField 1.0 ClockworkCompactField.qml
+ClockworkFullscreenBreak 1.0 ClockworkFullscreenBreak.qml

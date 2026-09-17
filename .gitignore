@@ -1,0 +1,42 @@
+# Temporary and editor files
+*~
+*.swp
+*.swo
+.DS_Store
+*.tmp
+*.bak
+*.orig
+
+# Scratch and debug directories
+scratch/
+*.log
+*.qslog
+*.patch
+
+# IDE and Editor configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# System and generated files
+.system_generated/
+.agents/
+.codex/
+.gemini/
+
+# Dependencies and virtual environments
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Build, cache, and distribution artifacts
+build/
+dist/
+.cache/
+
+# Internal documentation and audits
+AGENT.md
+audit.md
